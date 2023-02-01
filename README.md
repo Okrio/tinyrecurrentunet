@@ -5,10 +5,11 @@ kilobytes, which is small enough to be deployed on edge devices. In addition, th
 
 ## Training
 
-Assuming the dataset is stored in the waveform formate with the structure below:
+Inspired by the [CleanUNet](https://github.com/NVIDIA/CleanUNet)'s training methodology utilising DNSDataset, assuming the dataset is stored in the waveform formate with the structure below:
+
 ```
 Training sets: 
-./dns/training_dataset/clean/fileid_{0..59999}.wav
-./dns/training_dataset/noisy/fileid_{0..59999}.wav
-./dns/training_dataset/noise/fileid_{0..59999}.wav
+./training_dataset/clean/fileid_{0..10000}.wav
+./training_dataset/noisy/fileid_{0..10000}.wav
+./training_dataset/noise/fileid_{0..10000}.wav
 ```
