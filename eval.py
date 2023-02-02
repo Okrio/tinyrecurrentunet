@@ -1,3 +1,6 @@
+#The code has to be adjusted to 48kHz audio data.
+
+
 import os
 import sys
 from collections import defaultdict
@@ -29,8 +32,8 @@ def evaluate_dns(testset_path, enhanced_path, target):
 
         length = target_wav.shape[-1]
 
-        result['pesq_wb'] += pesq(16000, clean, target_wav, 'wb') * length  # wide band
-        result['pesq_nb'] += pesq(16000, clean, target_wav, 'nb') * length  # narrow band
+        result['pesq_wb'] += pesq(48000, clean, target_wav, 'wb') * length  # wide band
+        result['pesq_nb'] += pesq(48000, clean, target_wav, 'nb') * length  # narrow band
         result['stoi'] += stoi(clean, target_wav, rate) * length
         result['count'] += 1 * length
     
