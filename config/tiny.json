@@ -1,0 +1,54 @@
+{
+    "network" : {
+        "input_size" : 4,
+        "channels_input" : 64,
+        "channels_output": 4,
+        "channels_hidden": 128,
+        "kernel_sizes" : [5, 3],
+        "strides" : [2, 1],
+        "tr_channels_input" : 192
+    },
+
+    "train" : {
+        "exp_path" : "TRUNet",
+        "log":{
+            "directory" : "./exp",
+            "ckpt_iter" : "max",
+            "iters_per_ckpt" : "10000",
+            "iters_per_valid" : 500
+        },
+
+        "optimization":{
+            "n_iters" : 250000,
+            "learning_rate" : 2e-4,
+            "batch_size_per_gpu" : 8
+        },
+        "loss":{
+            "ell_p":1,
+            "ell_p_lambda":1,
+            "stft_lambda":1,
+            "stft_config":{
+                "sc_lamda": 0.5,
+                "mag_lambda": 0.5,
+                "band": "full",
+                "hop_sizes": [50, 120, 240],
+                "win_lengths": [240, 600, 1200],
+                "fft_sizes": [512, 1024, 2048]
+            }
+        }
+        
+    },
+    
+    "trainset" : {
+        "root": "./tru",
+        "crop_length_sec": 2,
+        "sample_rate":48000
+    },
+    "gen" : {
+        "output_directory": "./exp"
+    },
+    "dist": {
+        "dist_backend" : "nccl",
+        "dist_url": "tcp://localhost:54321"
+    }
+}  
