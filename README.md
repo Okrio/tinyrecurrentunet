@@ -6,8 +6,9 @@ Unofficial implementation of [REAL-TIME DENOISING AND DEREVERBERATION WTIH TINY 
 
 Inspired by [CleanUNet](https://github.com/NVIDIA/CleanUNet)'s training methodology, assuming the dataset is stored in the waveform formate with the structure below:
 
+
 ```
-Training sets: 
+Training set directory: 
 ./training_dataset/clean/fileid_{0..10000}.wav
 ./training_dataset/noisy/fileid_{0..10000}.wav
 ./training_dataset/noise/fileid_{0..10000}.wav
