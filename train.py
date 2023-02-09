@@ -13,7 +13,6 @@ random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
 
-
 from distributed import init_distributed, apply_gradient_allreduce, reduce_tensor
 from dataset import load_CleanNoisyPairDataset
 from stft_loss import MultiResolutionSTFTLoss
@@ -118,26 +117,26 @@ def train(num_gpus,
 
     while n_iter < optimization["n_iters"] + 1:
         # for each epoch
-        for clean_spec, noisy_spec, clean_audio, _, _ in trainloader: 
+        for clean_feat, noisy_feat, clean_audio, _, _ in trainloader: 
             
             #load data and send to device
-            clean_spec = clean_spec.cuda()
-            noisy_spec = noisy_spec.cuda()
+            clean_feat = clean_feat.cuda()
+            noisy_feat = noisy_feat.cuda()
             clean_audio = clean_audio.cuda()
             
-            # If you have a data augmentation function augment()
-            # noise = noisy_audio - clean_audio
-            # noise, clean_audio = augment((noise, clean_audio))
-            # noisy_audio = noise + clean_audio
 
-            # back-propagation
+            #forward propegation and loss calculation
             optimizer.zero_grad()
-            X = (clean_spec, noisy_spec, clean_audio)
+            X = (clean_feat, noisy_feat, clean_audio)
+            
             loss, loss_dic = loss_fn(net, X, **loss, mrstftloss=mrstftloss)
+            
             if num_gpus > 1:
                 reduced_loss = reduce_tensor(loss.data, num_gpus).item()
             else:
                 reduced_loss = loss.item()
+            
+            # back-propagation
             loss.backward()
             grad_norm = nn.utils.clip_grad_norm_(net.parameters(), 1e9)
             scheduler.step()
