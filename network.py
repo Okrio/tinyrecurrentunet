@@ -5,180 +5,35 @@ import torchaudio
 import librosa
 import torch.nn.init as init
 
-class PCENTransform(nn.Module):
-  
-  '''   code adopted from: 
-        https://www.kaggle.com/code/simongrest/trainable-pcen-frontend-in-pytorch
-        written by Simon Grest
-        
-        Computes trainable and static Per-Channel Energy Normalization (PCEN)
-        to normalize the energy of each channel seperately.
-        The PCEN process aims to enhance the dynamic range 
-        of the audio, by increasing the relative amplitude 
-        of lower energy signals, and decreasing the relative 
-        amplitude of higher energy signals. This helps the neural-
-        network to better handle variations in the audio signal 
-        and improves the robustness of the model to different levels 
-        of audio energy.
-        
-        It is recommended to apply PCEN before slicing the spectrograms;
-        during the preprocessing as there seems to be some information
-        losses when slicing is applied prior to PCEN transform. Therefore,
-        we set the parameter "trainable" to False.
-        
-        Input:
-            Magniture spectrogram of the signal converted to dB scale
-
-        Args:
-            eps   (float):
-            s     (float):
-            delta (int):
-            r     (float)
-            alpha (float):         Hyperparameter controlling the 'strength' of the Power-law compreession
-            r     (float):         Hyperparameter controlling the 'shape' of the Power-law compreession
-            trainable(str):        Boolean to make PCEN parameters trainable during training iterations
-        
-        Returns:
-            Normalized Spectrogram
-        
-  '''
-  def __init__(self,
-               eps = 1e-6,
-               s = 0.025,
-               alpha = 0.98,
-               delta = 2,
-               r = 0.5,
-               trainable = False):
-    super().__init__()
-    if trainable:
-      self.log_s = nn.Parameter(torch.log(torch.Tensor([s])))
-      self.log_alpha = nn.Parameter(torch.log(torch.Tensor([alpha])))
-      self.log_delta = nn.Parameter(torch.log(torch.Tensor([delta])))
-      self.log_r = nn.Parameter(torch.log(torch.Tensor([r])))
-    
-    else:
-      self.s = s
-      self.alpha = alpha
-      self.delta = delta
-      self.r = r
-    
-    self.eps = eps
-    self.trainable = trainable
-
-  
-  def _pcen(self,
-           x, 
-           eps=1E-6, 
-           s=0.025, 
-           alpha=0.98, 
-           delta=2, 
-           r=0.5, 
-           training=False):
-    
-    frames = x.split(1, -2)
-    m_frames = []
-    last_state = None
-    for frame in frames:
-        if last_state is None:
-            last_state = s * frame
-            m_frames.append(last_state)
-            continue
-        if training:
-            m_frame = ((1 - s) * last_state).add_(s * frame)
-        else:
-            m_frame = (1 - s) * last_state + s * frame
-        last_state = m_frame
-        m_frames.append(m_frame)
-    M = torch.cat(m_frames, 1)
-    if training:
-        pcen_ = (x / (M + eps).pow(alpha) + delta).pow(r) - delta ** r
-    else:
-        pcen_ = x.div_(M.add_(eps).pow_(alpha)).add_(delta).pow_(r).sub_(delta ** r)
-    return pcen_
-
-  
-  def forward(self, x):
-    x = x.permute((0, 1, 3, 2)).squeeze(dim=1)
-    
-    if self.trainable:
-      x = self._pcen(x, self.eps, torch.exp(self.log_s), 
-                                  torch.exp(self.log_alpha), 
-                                  torch.exp(self.log_delta), 
-                                  torch.exp(self.log_r), 
-                                  self.training and self.trainable)
-    else:
-      x = self._pcen(x, self.eps,
-                        self.s,
-                        self.alpha,
-                        self.delta,
-                        self.r,
-                        self.training and self.trainable)
-    
-    x = x.unsqueeze(dim=1).permute((0, 1, 3, 2))
-    return x
-
-
-
 
 class PhaseAwareMask(nn.Module):
   
   def __init__(self, 
-               beta,
-               fft_size,
-               hop_size):
+               beta = 0.5):
        
     """
-    Input:
-      Mixture (audio tensor):   audio signal containing speech and noise
-      Estimated (spectrogram):  denoised output from TRUNet
-
-
     Computes the Phase-aware β-sigmoid mask using magnitude and phase 
     information of mixture and estimated signal.
 
-    Args:
-      beta: mask coefficent controlling the sharpness of the mask - torch
-      mixture (complex): audio signal containing speech and noise combined 
-      estimated (float): output of the network. Estimated denoised audio signal
+    Input:
+        Mixture (spectrogram):    spectrogram containing speech and noise
+        Estimated (spectrogram):  denoised spectrogram output from network
 
-    Returns:
-      Masked Spectrogram of Shape:
+    Args:
+        beta (float): mask coefficent controlling the sharpness of the mask
     
+    Returns:
+        Masked audio (spectrogram)
     """
 
     super(PhaseAwareMask, self).__init__()
-    self.beta = beta
-    self.fft_size = self.fft_size
-    self.hop_size = self.hop_size
-    self.return_complex = True
-
-  
-  def _stft(self, x, 
-            fft_size, 
-            hop_size, 
-            win_length=None, 
-            window=None, 
-            return_complex=True):
-    
-    x_stft = torch.stft(x, 
-                        fft_size, 
-                        hop_size, 
-                        win_length, 
-                        window, 
-                        return_complex = return_complex)
-    return x_stft  
- 
+    self.beta = beta 
   
   def forward(self, mixture, estimated):
 
-    #compute stft
-    stft_mixture = self._stft(mixture, fft_size = self.fft_size, 
-                              hop_size = self.hop_size, 
-                              return_complex = self.return_complex)
-    
     #extract the magnitude and phase of the stft
-    mag_mix = torch.abs(stft_mixture)
-    phase_mix = torch.angle(stft_mixture)
+    mag_mix = torch.abs(mixture)
+    phase_mix = torch.angle(mixture)
 
     #extract the phase of the estimated sources 
     phase_est = torch.angle(estimated)
@@ -189,7 +44,6 @@ class PhaseAwareMask(nn.Module):
     #apply the soft mask to the magnitude of the mixture
     estimated = soft_mask * mag_mix
     return estimated
-
 
 
 
@@ -327,6 +181,7 @@ class TrCNN(nn.Module):
         return x
 
 
+
 class LastTrCNN(nn.Module):
     def __init__(self, in_channels, 
                        out_channels, 
@@ -366,7 +221,7 @@ class TRUNet(nn.Module):
 
 
         """
-        Model class compiles the TRUNet into an instance.
+        TRUNet Class
         
         Args:
             input_size (int):                      input to the network
@@ -382,7 +237,6 @@ class TRUNet(nn.Module):
         """
        
         super(TRUNet, self).__init__()
-        
         self.input_size = input_size
         self.down1 = StandardConv1d(input_size, channels_input, kernel_sizes[0], strides[0])
         self.down2 = DepthwiseSeparableConv1d(channels_input, channels_hidden,  kernel_sizes[1], strides[1])
@@ -403,15 +257,10 @@ class TRUNet(nn.Module):
         
         self.initialize_weights()
 
-    def forward(self, x):
+    
+    def forward(self, x):       
         # reshape incoming spectrogram
-        x1 = torch.reshape(x, (x.shape[1]//self.input_size, self.input_size, x.shape[2]))
-        
-        #PCEN
-        
-        ######
-        #here#
-        ######
+        #x = torch.reshape(x, (x.shape[1]//self.input_size, self.input_size, x.shape[2]))
         
         #Downsample
         x1 = self.down1(x)
@@ -434,17 +283,9 @@ class TRUNet(nn.Module):
         x14 = self.up4(x13,x3)
         x15 = self.up5(x14,x2)
         y =   self.up6(x15, x1)
-
+       
         #reverts back to original shape
-        y = torch.reshape(y, (-1, y.shape[0] * y.shape[1], T))
-        
-        #Phase-aware β-sigmoid mask
-        
-        ######
-        #here#
-        ######
-        
-        
+        #y = torch.reshape(y, (-1, y.shape[0] * y.shape[1], y.shape[2]))
         return y
     
     #weight initialization using normal distrbution
@@ -459,7 +300,6 @@ class TRUNet(nn.Module):
             elif isinstance(m, nn.BatchNorm1d):
                 init.constant_(m.weight, 1)
                 init.constant_(m.bias, 0)
-
 
 
 if __name__=='__main__':
