@@ -1,5 +1,5 @@
 # Adapted from https://github.com/NVIDIA/waveglow under the BSD 3-Clause License.
-
+# Adapted from https://github.com/NVIDIA/CleanUNet under the MIT License.
 # *****************************************************************************
 #  Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
