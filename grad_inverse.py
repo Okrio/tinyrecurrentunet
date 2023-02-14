@@ -16,7 +16,7 @@ class GradInverse(nn.Module):
     def spectral_convergence(self, input, target):
         return self.sc_coeff * ((input - target).norm().log10() - target.norm().log10())
 
-    def GRAD(self, 
+    def Gradient(self, 
              spec, 
              samples = None, 
              init_x0 = None, 
@@ -66,4 +66,4 @@ class GradInverse(nn.Module):
         return x
 
     def forward(self, x):
-        return self.GRAD(x)
+        return self.gradient(x)
