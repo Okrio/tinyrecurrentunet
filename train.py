@@ -12,6 +12,7 @@ import random
 random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
+warnings.filterwarnings("ignore")
 
 from distributed import init_distributed, apply_gradient_allreduce, reduce_tensor
 from dataset import load_CleanNoisyPairDataset
