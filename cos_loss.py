@@ -6,19 +6,18 @@ class CosSimLoss(nn.Module):
     """
     Cosine Similary Loss class
 
-    Args:
-        
-        eps (float): Small value to avoid division by zero
+    Args: 
+        eps (float): Small value to avoid division by zero in cosine similarity caluculation
         g (list):    Segments length 
     
     Call:    
-        x: input audio
-        y: target audio
+        x: Tensor (input audio signal)
+        y: Tensor (target audio signal)
     
     
     Returns:
-        average sum of cosine similary of a input and 
-        target tensors sliced with various lengths
+        Tensor (average sum of cosine similary of a input and 
+                target tensors sliced with various lengths)
     """
     
     def __init__(self,
@@ -43,7 +42,7 @@ class CosSimLoss(nn.Module):
         loss = []
         for i in range(len(self.g)):     
           
-          #get segment N/Mj
+          #get segment N/Mj and slice audio signal
           seg = self.g[i]
           x = x[:, :seg]
           y = y[:, :seg]
