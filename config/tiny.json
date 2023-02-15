@@ -43,9 +43,11 @@
         "crop_length_sec": 2,
         "sample_rate":48000
     },
+    
     "gen" : {
         "output_directory": "./exp"
     },
+    
     "dist": {
         "dist_backend" : "nccl",
         "dist_url": "tcp://localhost:54321"
