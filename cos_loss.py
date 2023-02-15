@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-
 class CosSimLoss(nn.Module):
     """
     Cosine Similary Loss class
