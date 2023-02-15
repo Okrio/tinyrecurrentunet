@@ -13,7 +13,6 @@ class CosSimLoss(nn.Module):
         x: Tensor (input audio signal)
         y: Tensor (target audio signal)
     
-    
     Returns:
         Tensor (average sum of cosine similary of a input and 
                 target tensors sliced with various lengths)
