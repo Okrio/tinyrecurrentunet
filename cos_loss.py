@@ -46,7 +46,7 @@ class CosSimLoss(nn.Module):
           x = x[:, :seg]
           y = y[:, :seg]
           
-          #calculate cosine similarity function
+          #calculate cosine similarity
           c = self.cos_sim_func(x, y)
           loss.append(c)
        
