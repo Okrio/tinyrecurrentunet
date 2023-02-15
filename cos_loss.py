@@ -33,8 +33,8 @@ class CosSimLoss(nn.Module):
         '''
         Computes cosine similarity of input and target
         '''
-        cos = nn.CosineSimilarity(dim=1, eps = self.eps)
-        loss = 1 - cos(input, target)
+        cosfunc = nn.CosineSimilarity(dim=1, eps = self.eps)
+        loss = 1 - cosfunc(input, target)
         return loss
     
     
