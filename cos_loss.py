@@ -30,7 +30,7 @@ class CosSimLoss(nn.Module):
 
     def cos_sim_func(self, input, target):
         '''
-        Computes cosine similarity of input and target
+        Computes cosine similarity between input and target
         '''
         cos = nn.CosineSimilarity(dim=1, eps = self.eps)
         cos_sim_loss = 1 - cos(input, target)
