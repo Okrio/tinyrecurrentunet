@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+
 class CosSimLoss(nn.Module):
     """
     Calculates Cosine Similary Loss for specific slices of
