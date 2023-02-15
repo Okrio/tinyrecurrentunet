@@ -11,6 +11,8 @@ import torch.nn.functional as F
 import torchaudio
 
 from stft_loss import MultiResolutionSTFTLoss
+from dataset import DataProcessing
+from cos_loss import CosSimLoss
 
 
 def flatten(v):
@@ -67,9 +69,8 @@ def print_size(net, keyword=None):
 ####################### lr scheduler: Linear Warmup then Cosine Decay #############################
 
 # Adapted from https://github.com/rosinality/vq-vae-2-pytorch
-
 # Original Copyright 2019 Kim Seonghyeon
-#  MIT License (https://opensource.org/licenses/MIT)
+# MIT License (https://opensource.org/licenses/MIT)
 
 
 def anneal_linear(start, end, proportion):
@@ -149,18 +150,97 @@ class LinearWarmupCosineDecay:
 
         return lr
 
+####################### UNWRAP function #############################
 
-####################### model util #############################
-def phm_sigmoid_mask(x):
-    pass
+# Adapted from https://github.com/ss12f32v/GANsynth-pytorch/blob/master/phase_operation.py
 
+# Original Copyright 2019 Yu-Hua Chen
+# MIT License (https://opensource.org/licenses/MIT)
+
+def diff(x, axis):
+    """Take the finite difference of a tensor along an axis.
+    Args:
+    x: Input tensor of any dimension.
+    axis: Axis on which to take the finite difference.
+    Returns:
+    d: Tensor with size less than x by 1 along the difference dimension.
+    Raises:
+    ValueError: Axis out of range for tensor.
+    """
+    shape = x.shape
+
+    begin_back = [0 for unused_s in range(len(shape))]
+#     print("begin_back",begin_back)
+    begin_front = [0 for unused_s in range(len(shape))]
+
+    begin_front[axis] = 1
+#     print("begin_front",begin_front)
+
+    size = list(shape)
+    size[axis] -= 1
+#     print("size",size)
+    slice_front = x[begin_front[0]:begin_front[0]+size[0], begin_front[1]:begin_front[1]+size[1]]
+    slice_back = x[begin_back[0]:begin_back[0]+size[0], begin_back[1]:begin_back[1]+size[1]]
+
+#     slice_front = tf.slice(x, begin_front, size)
+#     slice_back = tf.slice(x, begin_back, size)
+#     print("slice_front",slice_front)
+#     print(slice_front.shape)
+#     print("slice_back",slice_back)
+
+    d = slice_front - slice_back
+    return d
+
+ 
+def unwrap(p, discont=np.pi, axis=-1):
+    """Unwrap a cyclical phase tensor.
+    Args:
+    p: Phase tensor.
+    discont: Float, size of the cyclic discontinuity.
+    axis: Axis of which to unwrap.
+    Returns:
+    unwrapped: Unwrapped tensor of same size as input.
+    """
+    dd = diff(p, axis=axis)
+#     print("dd",dd)
+    ddmod = np.mod(dd+np.pi,2.0*np.pi)-np.pi  # ddmod = tf.mod(dd + np.pi, 2.0 * np.pi) - np.pi
+#     print("ddmod",ddmod)
+
+    idx = np.logical_and(np.equal(ddmod, -np.pi),np.greater(dd,0)) # idx = tf.logical_and(tf.equal(ddmod, -np.pi), tf.greater(dd, 0))
+#     print("idx",idx)
+    ddmod = np.where(idx, np.ones_like(ddmod) *np.pi, ddmod) # ddmod = tf.where(idx, tf.ones_like(ddmod) * np.pi, ddmod)
+#     print("ddmod",ddmod)
+    ph_correct = ddmod - dd
+#     print("ph_corrct",ph_correct)
+    
+    idx = np.less(np.abs(dd), discont) # idx = tf.less(tf.abs(dd), discont)
+    
+    ddmod = np.where(idx, np.zeros_like(ddmod), dd) # ddmod = tf.where(idx, tf.zeros_like(ddmod), dd)
+    ph_cumsum = np.cumsum(ph_correct, axis=axis) # ph_cumsum = tf.cumsum(ph_correct, axis=axis)
+#     print("idx",idx)
+#     print("ddmod",ddmod)
+#     print("ph_cumsum",ph_cumsum)
+    
+    
+    shape = np.array(p.shape) # shape = p.get_shape().as_list()
+
+    shape[axis] = 1
+    ph_cumsum = np.concatenate([np.zeros(shape, dtype=p.dtype), ph_cumsum], axis=axis) 
+    #ph_cumsum = tf.concat([tf.zeros(shape, dtype=p.dtype), ph_cumsum], axis=axis)
+    unwrapped = p + ph_cumsum
+#     print("unwrapped",unwrapped)
+    return unwrapped
+
+
+
+#model utls
 
 def std_normal(size):
     """
     Generate the standard Gaussian variable of a certain size
     """
-
     return torch.normal(0, 1, size=size).cuda()
+
 
 
 def weight_scaling_init(layer):
@@ -174,22 +254,11 @@ def weight_scaling_init(layer):
 
 
 @torch.no_grad()
-def sampling(net, noisy_spec):
+def sampling(net, noisy_features):
     """
-    Perform denoising (forward) step
+    Forward propegating noisy features
     """
-    return net(noisy_spec)
-
-
-
-def griffin_lim(denoised_spec, n_fft, hop_length):
-    """
-    Pefomrm spectrogram to waveform reconstruction using Griffin-Lim
-    """
-    
-    transform = torchaudio.transforms.GriffinLim(n_fft=n_fft, hop_length=hop_length)
-    waveform = transform(denoised_spec)
-    return waveform
+    return net(noisy_features)
 
 
 def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
@@ -212,28 +281,44 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
 
     assert type(X) == tuple and len(X) == 2
     
+    #Instantiate Dataprocessing and Cosine Similarity classes
+    dp = DataProcessing()
+    cs = CosSimLoss()
+    
     #Get noisy/clean specs and audio pairs
-    clean_spec, noisy_spec, clean_audio = X
+    clean_feat, noisy_feat, clean_audio = X
 
     B, C, L = clean_audio.shape
     output_dic = {}
     loss = 0.0
     
     #forward prop
-    denoised_spec = net(noisy_spec)  
+    denoised_feat = net(noisy_feat)  
+
+    #convert features back to time-domain
+    denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
+
+    modulate = dp.mod_phase(denoised_mag.detach().numpy(), 
+                            denoised_real.detach().numpy(), 
+                            denoised_imag.detach().numpy())
     
     #Spectrogram to waveform
-    denoised_audio = griffin_lim(denoised_spec.transpose(2, 1), n_fft = 512, hop_length = 128)
+    denoised_audio = dp.istft(modulate)
     
+
     # AE loss
-    if ell_p == 2: #L2 loss
-        ae_loss = nn.MSELoss()(denoised_audio, clean_audio)
-    elif ell_p == 1: #L1 loss
-        ae_loss = F.l1_loss(denoised_audio, clean_audio)
-    else:
-        raise NotImplementedError
-    loss += ae_loss * ell_p_lambda
-    output_dic["reconstruct"] = ae_loss.data * ell_p_lambda
+    #if ell_p == 2: #L2 loss
+    #    ae_loss = nn.MSELoss()(denoised_audio, clean_audio)
+    #elif ell_p == 1: #L1 loss
+    #    ae_loss = F.l1_loss(denoised_audio, clean_audio)
+    #else:
+    #    raise NotImplementedError
+    
+    # Cosine Similarity Loss
+    cs_loss = cs(denoised_audio, clean_audio)
+
+    loss += cs_loss * ell_p_lambda
+    output_dic["cos_sim_loss"] = cs_loss.data * ell_p_lambda
 
     if stft_lambda > 0:
         sc_loss, mag_loss = mrstftloss(denoised_audio.squeeze(1), clean_audio.squeeze(1))
