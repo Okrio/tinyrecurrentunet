@@ -1,26 +1,26 @@
-import torch
-import torch.nn as nn
-
 class CosSimLoss(nn.Module):
     """
-    Cosine Similary Loss class
-
-    Args: 
-        eps (float): Small value to avoid division by zero in cosine similarity caluculation
+    Calculates Cosine Similary Loss for specific slices of
+    input and target signals, namely the result from the model
+    and the ground truth (y , y_had).
+    
+    Args:      
+        eps (float): Small value to avoid division by zero
         g (list):    Segments length 
     
     Call:    
-        x: Tensor (input audio signal)
-        y: Tensor (target audio signal)
+        x: input audio
+        y: target audio
+    
     
     Returns:
-        Tensor (average sum of cosine similary of a input and 
-                target tensors sliced with various lengths)
+        average sum of cosine similary of a input and 
+        target tensors sliced with various lengths
     """
     
     def __init__(self,
                 eps = 1e-5,
-                g = [4062, 2032, 1016, 508]):
+                g = [508, 1016, 2032, 4062]):
         
         super(CosSimLoss, self).__init__()
         self.eps = eps
@@ -29,25 +29,27 @@ class CosSimLoss(nn.Module):
 
     def cos_sim_func(self, input, target):
         '''
-        Computes cosine similarity between input and target
+        Computes cosine similarity of input and target
         '''
         cos = nn.CosineSimilarity(dim=1, eps = self.eps)
-        cos_sim_loss = 1 - cos(input, target)
-        return cos_sim_loss
+        loss = 1 - cos(input, target)
+        return loss
     
     
     def forward(self, x, y):
+        
         loss = []
         for i in range(len(self.g)):     
+          if i == 0:
+            input =  x[:, : self.g[i]]
+            target = y[:, : self.g[i]]
           
-          #get segment N/Mj and slice audio signal
-          seg = self.g[i]
-          x = x[:, :seg]
-          y = y[:, :seg]
+          else:
+            input =  x[:, (self.g[i - 1]): self.g[i]]
+            target = y[:, (self.g[i - 1]): self.g[i]]
           
-          #calculate cosine similarity
-          c = self.cos_sim_func(x, y)
-          loss.append(c)
-       
-        return torch.sum(1 / self.m * torch.sum(torch.tensor(loss)))
-
+          #calculate cosine similarity function
+          c = self.cos_sim_func(input, target)
+          loss.append(c)      
+        
+        return (1 / self.m * torch.sum(torch.FloatTensor(loss))), loss
