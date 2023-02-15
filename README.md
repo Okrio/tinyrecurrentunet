@@ -4,7 +4,7 @@ Unofficial implementation of [REAL-TIME DENOISING AND DEREVERBERATION WTIH TINY 
 
 ## Dataset
 
-Inspired by [CleanUNet](https://github.com/NVIDIA/CleanUNet)'s training methodology, assuming the dataset is stored in the waveform format with the structure below:
+Inspired by [CleanUNet](https://github.com/NVIDIA/CleanUNet)'s training methodology, assuming the dataset is stored in the .wav format with the structure below:
 
 
 ```
