@@ -54,4 +54,4 @@ class CosSimLoss(nn.Module):
           c = self.cos_sim_func(input, target)
           loss.append(c)      
         
-        return (1 / self.m * torch.sum(torch.FloatTensor(loss))), loss
+        return (1 / self.m * torch.sum(torch.FloatTensor(loss)))
