@@ -19,122 +19,10 @@ np.random.seed(0)
 
 from torchvision import datasets, models, transforms
 import torchaudio
+import pcen
 
 
-class PCENTransform(nn.Module):
-  
-  '''   code adopted from: 
-        https://www.kaggle.com/code/simongrest/trainable-pcen-frontend-in-pytorch
-        written by Simon Grest
-        
-        Computes trainable Per-Channel Energy Normalization (PCEN)
-        The PCEN process aims to enhance the dynamic range 
-        of the audio, by increasing the relative amplitude 
-        of lower energy signals, and decreasing the relative 
-        amplitude of higher energy signals. This helps the neural-
-        network to better handle variations in the audio signal 
-        and improves the robustness of the model to different levels 
-        of audio energy.
-        
-        It is recommended to apply PCEN before slicing the spectrograms;
-        during the preprocessing as there seems to be some information
-        losses when slicing is applied prior to PCEN transform. Therefore,
-        we set the parameter "trainable" to False.
-        
-        Input:
-            Magniture spectrogram of the signal converted to dB scale
-
-        Args:
-            eps   (float):
-            s     (float):
-            delta (int):
-            alpha (float):         Hyperparameter controlling the 'strength' of the Power-law compreession
-            r     (float):         Hyperparameter controlling the 'shape' of the Power-law compreession
-            trainable(str):        Boolean to make PCEN parameters trainable during training iterations
-        
-        Returns:
-            Normalized Spectrogram        
-  '''
-  
-  def __init__(self,
-               eps = 1e-6,
-               s = 0.025,
-               alpha = 0.98,
-               delta = 2,
-               r = 0.5,
-               trainable = False):
-    super().__init__()
-    if trainable:
-      self.log_s = nn.Parameter(torch.log(torch.Tensor([s])))
-      self.log_alpha = nn.Parameter(torch.log(torch.Tensor([alpha])))
-      self.log_delta = nn.Parameter(torch.log(torch.Tensor([delta])))
-      self.log_r = nn.Parameter(torch.log(torch.Tensor([r])))
-    
-    else:
-      self.s = s
-      self.alpha = alpha
-      self.delta = delta
-      self.r = r
-    
-    self.eps = eps
-    self.trainable = trainable
-
-  
-  def _pcen(self,
-           x, 
-           eps=1E-6, 
-           s=0.025, 
-           alpha=0.98, 
-           delta=2, 
-           r=0.5, 
-           training=False):
-    
-    frames = x.split(1, -2)
-    m_frames = []
-    last_state = None
-    for frame in frames:
-        if last_state is None:
-            last_state = s * frame
-            m_frames.append(last_state)
-            continue
-        if training:
-            m_frame = ((1 - s) * last_state).add_(s * frame)
-        else:
-            m_frame = (1 - s) * last_state + s * frame
-        last_state = m_frame
-        m_frames.append(m_frame)
-    M = torch.cat(m_frames, 1)
-    if training:
-        pcen_ = (x / (M + eps).pow(alpha) + delta).pow(r) - delta ** r
-    else:
-        pcen_ = x.div_(M.add_(eps).pow_(alpha)).add_(delta).pow_(r).sub_(delta ** r)
-    return pcen_
-
-  
-  def forward(self, x):
-    x = x.transpose(2, 1)
-    
-    if self.trainable:
-      x = self._pcen(x, self.eps, torch.exp(self.log_s), 
-                                  torch.exp(self.log_alpha), 
-                                  torch.exp(self.log_delta), 
-                                  torch.exp(self.log_r), 
-                                  self.training and self.trainable)
-    else:
-      x = self._pcen(x, self.eps,
-                        self.s,
-                        self.alpha,
-                        self.delta,
-                        self.r,
-                        self.training and self.trainable)
-    
-    x = x.transpose(2, 1)
-    return x
-
-
-
-
-class DataPreprocessing:
+class DataProcessing:
 
     '''
     Data preprocessing class converts time-domain audio
@@ -156,90 +44,125 @@ class DataPreprocessing:
     
     '''
     def __init__(self):
-        self.pcen = PCENTransform()
+        self.pcen = pcen.StreamingPCENTransform(n_mels=257, 
+                                                n_fft=512, 
+                                                hop_length=128, 
+                                                trainable=True)
         self.n_fft = 512
         self.hop_length = 128
+        self.n_mels = 257
+
+    
+    def mod_phase(self, magnitude, real_demod, imag_demod):
+        """
+        Reverse operation of demodulation
+
+        Args:
+          real_demod(float32): real part of the demodulated signal
+          imag_demod(float32): imaginary part of the demodulated signal
+
+        Returns:
+          Spectrogram(comeplx64)
+        
+        """
+        #wrap phase back its original state 
+        wrap = torch.arctan2(real_demod, imag_demod)
+
+        #construct complex spectrogram
+        complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
+        return complex_spectrogram
 
 
-    def _mod_phase(self):
-        pass
 
-    def _demod_phase(self, magnitude, phase):
+    def _demod_phase(self, spectrogram):
         
         '''
         Calculates demodulated phase of real and imaginary
 
         Args:
-            magnitude: (float32)
-            phase:     (float32)
+            spectrogram
 
         Returns:
             real_demod (float32):   Demodulated phase of real
             imag_demod (float32):   Demodulated phase of imaginary
         '''
+
+        phase = torch.angle(spectrogram)
+        phase = phase.squeeze(0).detach().numpy() #to numpy 
         
-        #get carrier signal for real and imaginary part
-        carrier_real = torch.cos(phase)
-        carrier_imag = torch.sin(phase)
+        #calculate demodulated phase
+        demodulated_phase = np.unwrap(phase)
+        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0)
         
-        #calculate real and imag demod
-        real_demod = magnitude * carrier_real
-        imag_demod = magnitude * carrier_imag
+        #get real and imagniary parts of the demodulated phase
+        real_demod = torch.sin(demodulated_phase)
+        imag_demod = torch.cos(demodulated_phase)
 
         return real_demod, imag_demod
+
+
+    def log_mag(self, spectrogram):
+        x = torch.log(torch.abs(spectrogram))
+        return torch.tensor(x)
     
     
     
-    def _stft(self, audio, pcen=False):
+    def istft(self, spectrogram):
+        """
+        Compute inverse short-time fourier transform
+        """
+        return torch.istft(spectrogram,
+                             n_fft=self.n_fft,
+                             hop_length=self.hop_length)
+
+    
+    def _stft(self, signal):
 
         '''
         Compute complex form short-time fourier transform
         '''
-        spectrogram = torch.stft(audio, n_fft = self.n_fft, hop_length = self.hop_length, return_complex = True)
-        return spectrogram
+        return torch.stft(signal, 
+                            n_fft=self.n_fft, 
+                            hop_length=self.hop_length,
+                            return_complex=True)
             
-    
-    def istft(self, features):
-        pass
 
-    def _pre_pcen(self, mag, phase):
-        return torch.sqrt(torch.clamp(mag**2 + phase**2, min=1e-7))
+    def _pcen(self, signal):
+        return self.pcen(signal)
 
     
     def perm(self, tensor):
-      '''
-      permute function
-      '''
-      return tensor.permute(1, 0, 2)
+        '''
+        permute function
+        '''
+        return tensor.permute(1, 0, 2)
    
    
+    
     def __call__(self, audio):
+        
         #get spectrogram from audio
-        spec = self._stft(audio)
-        
-        #magnitude and phase
-        mag, phase = torch.abs(spec), torch.angle(spec)
+        spectrogram = self._stft(audio)
 
-        #real and imag demodulated phase
-        real_demod, imag_demod = self._demod_phase(mag, phase)
-        
-        #power to db conversion (log-spectrogram)
-        log_spec = torch.log(mag)
+        #calculate log-magnitude, real and imaginary part of demodulcated phase
+        log_magnitude = self.log_mag(spectrogram)
+        real_demod, imag_demod = self._demod_phase(spectrogram)
 
-        #apply pcen
-        pcen = self.pcen(self._pre_pcen(mag, phase))
-        
+        #calculate PCEN
+        pcen = self._pcen(audio).permute(0, 2, 1)
+
         #concatenate and permute data to be fed to the network
-        data = torch.cat((self.perm(log_spec),
+        data = torch.cat((self.perm(log_magnitude),
                           self.perm(pcen),
                           self.perm(real_demod),
                           self.perm(imag_demod)), dim = 1)
         
-        #return data (time_frame, 4 features, freq_bins)
+        #returns data of structure (time_frame, 4 features, freq_bins)
         return data
 
 
 
+      
 class CleanNoisyPairDataset(Dataset):
     """
     Create a Dataset of clean and noisy audio pairs. 
