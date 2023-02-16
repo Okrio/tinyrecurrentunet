@@ -108,7 +108,7 @@ class FirstTrCNN(nn.Module):
             nn.BatchNorm1d(out_channels),
             nn.ReLU(inplace=True)
         )
-    def forward(self,x):
+    def forward(self, x):
         return self.FirstTrCNN(x)
 
 
@@ -158,7 +158,7 @@ class LastTrCNN(nn.Module):
                                 stride = stride,
                                 padding=stride//2))
 
-    def forward(self,x1,x2):
+    def forward(self, x1, x2):
         diffY = x2.size()[2] - x1.size()[2]
         x1 = F.pad(x1, [diffY // 2, diffY - diffY // 2, 0, 0])
         x = torch.cat((x1, x2), 1)
@@ -228,7 +228,7 @@ class TRUNet(nn.Module):
         x4 = self.down4(x3)
         x5 = self.down5(x4)
         x6 = self.down6(x5)
-        
+
         #Bottleneck
         x7 = x6.transpose(1, 2)
         x8 = self.FGRU(x7)
@@ -241,7 +241,7 @@ class TRUNet(nn.Module):
         x13 = self.up3(x12,x4)
         x14 = self.up4(x13,x3)
         x15 = self.up5(x14,x2)
-        y =   self.up6(x15, x1)
+        y =   self.up6(x15,x1)
        
         #reverts back to original shape
         #y = torch.reshape(y, (-1, y.shape[0] * y.shape[1], y.shape[2]))
@@ -259,27 +259,3 @@ class TRUNet(nn.Module):
             elif isinstance(m, nn.BatchNorm1d):
                 init.constant_(m.weight, 1)
                 init.constant_(m.bias, 0)
-
-
-if __name__=='__main__':
-    
-    import json
-    import argparse
-    import os
-    
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='/content/tiny.json', 
-          help='Json Configuration file')
-    args = parser.parse_args()
-    
-    #load arguments from json file
-    with open(args.config) as f:
-        data = f.read()
-    config = json.loads(data)
-    network_config = config["network"]
-    
-    #load model
-    TRU = TRUNet(**network_config).cuda
-    total_params = sum(p.numel() for p in TRU.parameters())
-    
-    print("total TRUNet params:", total_params)
