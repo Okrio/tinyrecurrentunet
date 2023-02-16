@@ -199,7 +199,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
 
     assert type(X) == tuple and len(X) == 2
     
-    #Instantiate Dataprocessing and Cosine Similarity classes
+    #instantiate Dataprocessing and Cosine Similarity Loss classes
     dp = DataProcessing()
     cs = CosSimLoss()
     
@@ -215,10 +215,11 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
 
     #convert features back to time-domain
     denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
-
-    modulate = dp.mod_phase(denoised_mag.detach().numpy(), 
-                            denoised_real.detach().numpy(), 
-                            denoised_imag.detach().numpy())
+    
+    #reverse function of demodulate
+    modulate = dp.mod_phase(denoised_mag, 
+                            denoised_real, 
+                            denoised_imag)
     
     #Spectrogram to waveform
     denoised_audio = dp.istft(modulate)
@@ -237,7 +238,8 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
 
     loss += cs_loss #* ell_p_lambda
     output_dic["cos_sim_loss"] = cs_loss.data * ell_p_lambda
-
+    
+    #multi resolution short-time fourier transform loss
     if stft_lambda > 0:
         sc_loss, mag_loss = mrstftloss(denoised_audio.squeeze(1), clean_audio.squeeze(1))
         loss += (sc_loss + mag_loss) * stft_lambda
