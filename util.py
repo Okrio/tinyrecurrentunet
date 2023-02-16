@@ -14,6 +14,10 @@ from stft_loss import MultiResolutionSTFTLoss
 from dataset import DataProcessing
 from cos_loss import CosSimLoss
 
+#instantiate Dataprocessing and Cosine Similarity Loss classes
+dp = DataProcessing()
+cs = CosSimLoss()
+
 
 def flatten(v):
     return [x for y in v for x in y]
@@ -198,10 +202,6 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     """
 
     assert type(X) == tuple and len(X) == 2
-    
-    #instantiate Dataprocessing and Cosine Similarity Loss classes
-    dp = DataProcessing()
-    cs = CosSimLoss()
     
     #Get noisy/clean specs and audio pairs
     clean_feat, noisy_feat, clean_audio = X
