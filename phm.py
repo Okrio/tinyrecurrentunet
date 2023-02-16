@@ -1,3 +1,5 @@
+#Phase-aware β-sigmoid
+
 import torch
 import torch.nn as nn
 
