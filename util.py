@@ -211,7 +211,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     loss = 0.0
     
     #forward prop
-    denoised_feat = net(noisy_feat)  
+    denoised_feat = net(noisy_feat.squeeze(0))  
 
     #convert features back to time-domain
     denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
