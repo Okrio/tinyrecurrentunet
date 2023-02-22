@@ -212,7 +212,7 @@ class CleanNoisyPairDataset(Dataset):
 
     
 
-    def __getitem(self, n):
+    def __getitem__(self, n):
         fileid = self.files[n]
         clean_audio, sample_rate = torchaudio.load(fileid[0])
         noisy_audio, sample_rate = torchaudio.load(fileid[1])
