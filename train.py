@@ -1,295 +1,213 @@
 import os
+import time
+import argparse
+import json
+
 import numpy as np
-
-from scipy.io.wavfile import read as wavread
-import warnings
-warnings.filterwarnings("ignore")
-
 import torch
 import torch.nn as nn
-import torchaudio
-from torch.utils.data import Dataset
-from torch.utils.data.distributed import DistributedSampler
-from torchaudio import transforms
+from torch.utils.tensorboard import SummaryWriter
 
 import random
 random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
 
-from torchvision import datasets, models, transforms
-import torchaudio
-import pcen
+from distributed import init_distributed, apply_gradient_allreduce, reduce_tensor
+from dataset import load_CleanNoisyPairDataset
+from stft_loss import MultiResolutionSTFTLoss
+from util import rescale, find_max_epoch, print_size
+from util import LinearWarmupCosineDecay, loss_fn
+
+from network import TRUNet
 
 
-class DataProcessing:
+def train(num_gpus, 
+          rank, 
+          group_name, 
+          exp_path, 
+          log, 
+          optimization, 
+          loss):
 
-    '''
-    Data preprocessing class converts time-domain audio
-    signal into structure of shape (timeframe, 4, freq_bins)
-    where 4 dimension represents:
-        (log_spctrogram,
-         pcen transformed spectrogram,
-         real part of demodulated phase,
-         imag part of demodulated phase)
+    # setup local experiment path
+    if rank == 0:
+        print('exp_path:', exp_path)
     
-    Input:
-        Tuple: ((1, time-domain signal) clean),
-                (1, time-domain signal) noisy))
+    # Create tensorboard logger.
+    log_directory = os.path.join(log["directory"], exp_path)
+    if rank == 0:
+        tb = SummaryWriter(os.path.join(log_directory, 'tensorboard'))
+
+    # distributed running initialization
+    if num_gpus > 1:
+        init_distributed(rank, num_gpus, group_name, **dist_config)
+
+    # Get shared ckpt_directory ready
+    ckpt_directory = os.path.join(log_directory, 'checkpoint')
+    if rank == 0:
+        if not os.path.isdir(ckpt_directory):
+            os.makedirs(ckpt_directory)
+            os.chmod(ckpt_directory, 0o775)
+        print("ckpt_directory: ", ckpt_directory, flush=True)
+
+    # load training data
+    trainloader = load_CleanNoisyPairDataset(**trainset_config, 
+                            subset='training',
+                            batch_size=optimization["batch_size_per_gpu"], 
+                            num_gpus=num_gpus)
+    print('Data loaded')
     
-    Returns:
-        Tuple: ((time-frame, 4, freq_bins) clean,
-                (time-frame, 4, freq_bins) noisy)
-    
-    
-    '''
-    def __init__(self):
-        self.pcen = pcen.StreamingPCENTransform(n_mels=257, 
-                                                n_fft=512, 
-                                                hop_length=128, 
-                                                trainable=True)
-        self.n_fft = 512
-        self.hop_length = 128
-        self.n_mels = 257
+    # predefine model
+    net = TRUNet(**network_config).cuda()
+    print_size(net)
 
-    
-    def mod_phase(self, magnitude, real_demod, imag_demod):
-        """
-        Reverse operation of demodulation
+    # apply gradient all reduce
+    if num_gpus > 1:
+        net = apply_gradient_allreduce(net)
 
-        Args:
-          real_demod(float32): real part of the demodulated signal
-          imag_demod(float32): imaginary part of the demodulated signal
+    # define optimizer AdamW
+    optimizer = torch.optim.AdamW(net.parameters(), lr=optimization["learning_rate"])
 
-        Returns:
-          Spectrogram(comeplx64)
-        
-        """
-        #wrap phase back its original state 
-        wrap = torch.arctan2(real_demod, imag_demod)
+    # load checkpoint
+    time0 = time.time()
+    if log["ckpt_iter"] == 'max':
+        ckpt_iter = find_max_epoch(ckpt_directory)
+    else:
+        ckpt_iter = log["ckpt_iter"]
+    if ckpt_iter >= 0:
+        try:
+            # load checkpoint file
+            model_path = os.path.join(ckpt_directory, '{}.pkl'.format(ckpt_iter))
+            checkpoint = torch.load(model_path, map_location='cpu')
+            
+            # feed model dict and optimizer state
+            net.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        #construct complex spectrogram
-        complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
-        return complex_spectrogram
+            # record training time based on elapsed time
+            time0 -= checkpoint['training_time_seconds']
+            print('Model at iteration %s has been trained for %s seconds' % (ckpt_iter, checkpoint['training_time_seconds']))
+            print('checkpoint model loaded successfully')
+        except:
+            ckpt_iter = -1
+            print('No valid checkpoint model found, start training from initialization.')
+    else:
+        ckpt_iter = -1
+        print('No valid checkpoint model found, start training from initialization.')
 
+    # training
+    n_iter = ckpt_iter + 1
 
+    # define learning rate scheduler and stft-loss
+    scheduler = LinearWarmupCosineDecay(
+                    optimizer,
+                    lr_max=optimization["learning_rate"],
+                    n_iter=optimization["n_iters"],
+                    iteration=n_iter,
+                    divider=25,
+                    warmup_proportion=0.05,
+                    phase=('linear', 'cosine'),
+                )
 
-    def _demod_phase(self, spectrogram):
-        
-        '''
-        Calculates demodulated phase of real and imaginary
+    if loss["stft_lambda"] > 0:
+        mrstftloss = MultiResolutionSTFTLoss(**loss["stft_config"]).cuda()
+    else:
+        mrstftloss = None
 
-        Args:
-            spectrogram
+    while n_iter < optimization["n_iters"] + 1:
+        # for each epoch
 
-        Returns:
-            real_demod (float32):   Demodulated phase of real
-            imag_demod (float32):   Demodulated phase of imaginary
-        '''
-
-        phase = torch.angle(spectrogram)
-        phase = phase.squeeze(0).detach().numpy() #to numpy 
-        
-        #calculate demodulated phase
-        demodulated_phase = np.unwrap(phase)
-        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0)
-        
-        #get real and imagniary parts of the demodulated phase
-        real_demod = torch.sin(demodulated_phase)
-        imag_demod = torch.cos(demodulated_phase)
-
-        return real_demod.requires_grad_(True), imag_demod.requires_grad_(True)
-
-
-    def log_mag(self, spectrogram):
-        x = torch.log(torch.abs(spectrogram))
-        return torch.tensor(x, requires_grad=True)
-    
-    
-    
-    def istft(self, spectrogram):
-        """
-        Compute inverse short-time fourier transform
-        """
-        return torch.istft(spectrogram,
-                             n_fft=self.n_fft,
-                             hop_length=self.hop_length)
-
-    
-    def _stft(self, signal):
-
-        '''
-        Compute complex form short-time fourier transform
-        '''
-        return torch.stft(signal, 
-                            n_fft=self.n_fft, 
-                            hop_length=self.hop_length,
-                            return_complex=True)
+        for clean_feat, noisy_feat, clean_audio, noisy_audio, fileid in trainloader: 
+            
+            #load data and send to device
+            clean_feat = clean_feat.cuda()
+            noisy_feat = noisy_feat.cuda()
+            clean_audio = clean_audio.cuda()
             
 
-    def _pcen(self, signal):
-        x = self.pcen(signal)
-        return x
-
-    
-    def perm(self, tensor):
-        '''
-        permute function
-        '''
-        return tensor.permute(1, 0, 2)
-   
-   
-    
-    def __call__(self, audio):
-        
-        #get spectrogram from audio
-        spectrogram = self._stft(audio)
-
-        #calculate log-magnitude, real and imaginary part of demodulcated phase
-        log_magnitude = self.log_mag(spectrogram)
-        real_demod, imag_demod = self._demod_phase(spectrogram)
-
-        #calculate PCEN
-        pcen = self._pcen(audio).permute(0, 2, 1)
-
-        #concatenate and permute data to be fed to the network
-        data = torch.cat((self.perm(log_magnitude.requires_grad_(False)),
-                          self.perm(pcen).detach(),
-                          self.perm(real_demod.requires_grad_(False)),
-                          self.perm(imag_demod.requires_grad_(False))), dim = 1)
-        
-        #returns data of structure (time_frame, 4 features, freq_bins)
-        return data
-
-
-
-      
-class CleanNoisyPairDataset(Dataset):
-    """
-    Create a Dataset of clean and noisy audio pairs. 
-    Each element is a tuple of the form (clean_spectrogam, noisy_spectrogram, clean waveform, noisy waveform, file_id)
-    
-    Returns:
-       (Clean Spectrogram, Noisy Spectrogram, Clean Audio, Noisy Audio, Filed id)
-    """
-    
-    def __init__(self, root='./', subset='training', crop_length_sec=0):
-        super(CleanNoisyPairDataset).__init__()
-        
-
-        self.dp = DataProcessing()
-        
-        assert subset is None or subset in ["training", "testing"]
-        self.crop_length_sec = crop_length_sec
-        self.subset = subset
-
-        N_clean = len(os.listdir(os.path.join(root, 'training_set/clean')))
-        N_noisy = len(os.listdir(os.path.join(root, 'training_set/noisy')))
-        assert N_clean == N_noisy
-
-        
-        if subset == "training":
-            self.files = [(os.path.join(root, 'training_set/clean', 'fileid_{}.wav'.format(i)),
-                           os.path.join(root, 'training_set/noisy', 'fileid_{}.wav'.format(i))) for i in range(N_clean)]
-        elif subset == "testing":
-            sortkey = lambda name: '_'.join(name.split('_')[-2:])  # specific for dns due to test sample names
-            _p = os.path.join(root, 'datasets/test_set/synthetic/no_reverb')  # path for DNS
+            #forward propegation and loss calculation
+            optimizer.zero_grad()
+            X = (clean_feat, noisy_feat, clean_audio)
             
-            clean_files = os.listdir(os.path.join(_p, 'clean'))
-            noisy_files = os.listdir(os.path.join(_p, 'noisy'))
-            
-            clean_files.sort(key=sortkey)
-            noisy_files.sort(key=sortkey)
+            loss, loss_dic = loss_fn(net, X, **loss, mrstftloss=mrstftloss)
+            if num_gpus > 1:
+                reduced_loss = reduce_tensor(loss.data, num_gpus).item()
+            else:
+                reduced_loss = loss.item()
+            # back-propagation
+            loss.backward()
+            grad_norm = nn.utils.clip_grad_norm_(net.parameters(), 1e9)
+            scheduler.step()
+            optimizer.step()
 
-            self.files = []
-            for _c, _n in zip(clean_files, noisy_files):
-                assert sortkey(_c) == sortkey(_n)
-                self.files.append((os.path.join(_p, 'clean', _c), 
-                                   os.path.join(_p, 'noisy', _n)))
-            self.crop_length_sec = 0
+            # output to log
+            if n_iter % log["iters_per_valid"] == 0:
+                print("iteration: {} \treduced loss: {:.7f} \tloss: {:.7f}".format(
+                    n_iter, reduced_loss, loss.item()), flush=True)
+                
+                if rank == 0:
+                    # save to tensorboard
+                    tb.add_scalar("Train/Train-Loss", loss.item(), n_iter)
+                    tb.add_scalar("Train/Train-Reduced-Loss", reduced_loss, n_iter)
+                    tb.add_scalar("Train/Gradient-Norm", grad_norm, n_iter)
+                    tb.add_scalar("Train/learning-rate", optimizer.param_groups[0]["lr"], n_iter)
 
-        else:
-            raise NotImplementedError 
+            # save checkpoint
+            if n_iter > 0 and n_iter % log["iters_per_ckpt"] == 0 and rank == 0:
+                checkpoint_name = '{}.pkl'.format(n_iter)
+                torch.save({'iter': n_iter,
+                            'model_state_dict': net.state_dict(),
+                            'optimizer_state_dict': optimizer.state_dict(),
+                            'training_time_seconds': int(time.time()-time0)}, 
+                            os.path.join(ckpt_directory, checkpoint_name))
+                print('model at iteration %s is saved' % n_iter)
 
-    
+            n_iter += 1
 
-    def __getitem__(self, n):
-        fileid = self.files[n]
-        clean_audio, sample_rate = torchaudio.load(fileid[0])
-        noisy_audio, sample_rate = torchaudio.load(fileid[1])
-        clean_audio, noisy_audio = clean_audio.squeeze(0), noisy_audio.squeeze(0) #check if this applicable for spectrogram conversion
-        assert len(clean_audio) == len(noisy_audio)
+    # After training, close TensorBoard.
+    if rank == 0:
+        tb.close()
 
-        crop_length = int(self.crop_length_sec * sample_rate)
-        assert crop_length < len(clean_audio)
-           
-        #random crop in the time domain
-        if self.subset != 'testing' and crop_length > 0:
-            start = np.random.randint(low=0, high=len(clean_audio) - crop_length + 1)
-            clean_audio = clean_audio[start:(start + crop_length)]
-            noisy_audio = noisy_audio[start:(start + crop_length)]
-
-        #prepare audio signal and spectrogram data pairs
-        clean_audio, noisy_audio = clean_audio.unsqueeze(0), noisy_audio.unsqueeze(0)
-        clean_features = self.dp(clean_audio)
-        noisy_features =  self.dp(noisy_audio)
-        #make input shape suitable for network
-        return (clean_features, noisy_features, clean_audio, noisy_audio, fileid)
-
-    
-    def __len__(self):
-        return len(self.files)
+    return 0
 
 
-def load_CleanNoisyPairDataset(root,
-                               subset,
-                               crop_length_sec,
-                               batch_size,
-                               sample_rate,
-                               num_gpus = 1):
-        
-        dataset = CleanNoisyPairDataset(root = root, subset = subset, crop_length_sec=crop_length_sec)
-        kwargs = {'batch_size': batch_size,
-                  'num_workers': 4,
-                  'pin_memory': False,
-                  'drop_last': False}
-        
-        if num_gpus > 1:
-            train_sampler = DistributedSampler(dataset)
-            dataloader = torch.utils.data.Dataloader(dataset, sampler=train_sampler, **kwargs)
-        else:
-            dataloader = torch.utils.data.DataLoader(dataset, sampler=None, shuffle=True, **kwargs)
-        
-        return dataloader
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config',     type=str, default='config.json', help='JSON file for configuration')
+    parser.add_argument('-r', '--rank',       type=int, default=0,  help='rank of process for distributed')
+    parser.add_argument('-g', '--group_name', type=str, default='', help='name of group for distributed')
+    args = parser.parse_args()
 
-
-if __name__ == '__main__':
-    import json
-    with open('/content/tinyrecurrentunet/config/tiny.json') as f:
+    # Parse configs. Globals nicer in this case
+    print(args.config)
+    with open(args.config) as f:
         data = f.read()
     config = json.loads(data)
-    print('everrrrrrrr')
-    trainset_config = config('trainset')
+    train_config = config["train"]       # training parameters
     
-    trainloader = load_CleanNoisyPairDataset(**trainset_config,
-                                             subset='training',
-                                             batch_size=2,
-                                             num_gpus=1)
-    testloader = load_CleanNoisyPairDataset(**trainset_config,
-                                            subset='testing',
-                                            batch_size=2,
-                                            num_gpus=1)
-    print(len(trainloader), len(testloader))
+    global dist_config
+    dist_config = config["dist"]         # to initialize distributed training
     
-    for clean_feat, noisy_feat, clean_audio, noisy_audio, fileid in trainloader:
-        
-        clean_feat = clean_feat.cuda()
-        noisy_feat = noisy_feat.cuda()
-        
-        clean_audio = clean_audio.cuda()
-        noisy_audio = noisy_audio.cuda()
-        
-        print(clean_feat.shape, noisy_audio.shape, fileid)
-        print(clean_audio.shape, noisy_audio.shape, fileid)
-        break       
+    global network_config
+    network_config = config["network"]   # to define network
+    print()
+    global trainset_config
+    trainset_config = config["trainset"] # to load trainset
 
+    num_gpus = torch.cuda.device_count()
+    if num_gpus > 1:
+        if args.group_name == '':
+            print("WARNING: Multiple GPUs detected but no distributed group set")
+            print("Only running 1 GPU. Use distributed.py for multiple GPUs")
+            num_gpus = 1
+
+    if num_gpus == 1 and args.rank != 0:
+        raise Exception("Doing single GPU training on rank > 0")
+
+    torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = True
+    train(num_gpus, 
+          args.rank, 
+          args.group_name, 
+          **train_config)
