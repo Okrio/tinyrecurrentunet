@@ -98,12 +98,12 @@ class DataProcessing:
         real_demod = torch.sin(demodulated_phase)
         imag_demod = torch.cos(demodulated_phase)
 
-        return real_demod, imag_demod
+        return real_demod.requires_grad_(True), imag_demod.requires_grad_(True)
 
 
     def log_mag(self, spectrogram):
         x = torch.log(torch.abs(spectrogram))
-        return torch.tensor(x)
+        return torch.tensor(x, requires_grad=True)
     
     
     
@@ -128,14 +128,15 @@ class DataProcessing:
             
 
     def _pcen(self, signal):
-        return self.pcen(signal)
+        x = self.pcen(signal)
+        return x
 
     
     def perm(self, tensor):
         '''
         permute function
         '''
-        return tensor.permute(1, 0, 2)
+        return tensor.permute(2, 0, 1)
    
    
     
@@ -150,12 +151,12 @@ class DataProcessing:
 
         #calculate PCEN
         pcen = self._pcen(audio).permute(0, 2, 1)
-
+        
         #concatenate and permute data to be fed to the network
-        data = torch.cat((self.perm(log_magnitude),
-                          self.perm(pcen),
-                          self.perm(real_demod),
-                          self.perm(imag_demod)), dim = 1)
+        data = torch.cat((self.perm(log_magnitude.requires_grad_(False)),
+                          self.perm(pcen).detach(),
+                          self.perm(real_demod.requires_grad_(False)),
+                          self.perm(imag_demod.requires_grad_(False))), dim = 1)
         
         #returns data of structure (time_frame, 4 features, freq_bins)
         return data
@@ -186,10 +187,10 @@ class CleanNoisyPairDataset(Dataset):
         N_noisy = len(os.listdir(os.path.join(root, 'training_set/noisy')))
         assert N_clean == N_noisy
 
+        
         if subset == "training":
             self.files = [(os.path.join(root, 'training_set/clean', 'fileid_{}.wav'.format(i)),
                            os.path.join(root, 'training_set/noisy', 'fileid_{}.wav'.format(i))) for i in range(N_clean)]
-        
         elif subset == "testing":
             sortkey = lambda name: '_'.join(name.split('_')[-2:])  # specific for dns due to test sample names
             _p = os.path.join(root, 'datasets/test_set/synthetic/no_reverb')  # path for DNS
@@ -221,7 +222,7 @@ class CleanNoisyPairDataset(Dataset):
 
         crop_length = int(self.crop_length_sec * sample_rate)
         assert crop_length < len(clean_audio)
-            
+           
         #random crop in the time domain
         if self.subset != 'testing' and crop_length > 0:
             start = np.random.randint(low=0, high=len(clean_audio) - crop_length + 1)
@@ -230,8 +231,8 @@ class CleanNoisyPairDataset(Dataset):
 
         #prepare audio signal and spectrogram data pairs
         clean_audio, noisy_audio = clean_audio.unsqueeze(0), noisy_audio.unsqueeze(0)
-        clean_features, noisy_features = self.dp(clean_audio), self.dp(noisy_audio)
-        
+        clean_features = self.dp(clean_audio)
+        noisy_features =  self.dp(noisy_audio)
         #make input shape suitable for network
         return (clean_features, noisy_features, clean_audio, noisy_audio, fileid)
 
@@ -257,18 +258,19 @@ def load_CleanNoisyPairDataset(root,
             train_sampler = DistributedSampler(dataset)
             dataloader = torch.utils.data.Dataloader(dataset, sampler=train_sampler, **kwargs)
         else:
-            dataloader = torch.utils.data.Dataloader(dataset, sampler=None, shuffle=True, **kwargs)
+            dataloader = torch.utils.data.DataLoader(dataset, sampler=None, shuffle=True, **kwargs)
         
         return dataloader
 
 
 if __name__ == '__main__':
     import json
-    with open('./configs/tiny.json') as f:
+    with open('/content/tinyrecurrentunet/config/tiny.json') as f:
         data = f.read()
     config = json.loads(data)
-    trainset_config = config('train')
-
+    print('everrrrrrrr')
+    trainset_config = config('trainset')
+    
     trainloader = load_CleanNoisyPairDataset(**trainset_config,
                                              subset='training',
                                              batch_size=2,
@@ -278,7 +280,7 @@ if __name__ == '__main__':
                                             batch_size=2,
                                             num_gpus=1)
     print(len(trainloader), len(testloader))
-
+    
     for clean_feat, noisy_feat, clean_audio, noisy_audio, fileid in trainloader:
         
         clean_feat = clean_feat.cuda()
