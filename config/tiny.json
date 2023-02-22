@@ -39,7 +39,7 @@
     },
     
     "trainset" : {
-        "root": "./tru",
+        "root": "./content/MyDrive/Insone/DNSDataset/",
         "crop_length_sec": 2,
         "sample_rate":48000
     },
