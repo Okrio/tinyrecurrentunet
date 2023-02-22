@@ -201,7 +201,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
         
     """
 
-    assert type(X) == tuple and len(X) == 2
+    assert type(X) == tuple and len(X) == 3
     
     #Get noisy/clean specs and audio pairs
     clean_feat, noisy_feat, clean_audio = X
