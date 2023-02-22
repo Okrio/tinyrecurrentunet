@@ -28,7 +28,7 @@
             "ell_p_lambda":1,
             "stft_lambda":1,
             "stft_config":{
-                "sc_lamda": 0.5,
+                "sc_lambda": 0.5,
                 "mag_lambda": 0.5,
                 "band": "full",
                 "hop_sizes": [50, 120, 240],
@@ -39,7 +39,7 @@
     },
     
     "trainset" : {
-        "root": "./content/MyDrive/Insone/DNSDataset/",
+        "root": "/content/content/MyDrive/Insone/DSNDataset",
         "crop_length_sec": 2,
         "sample_rate":48000
     },
