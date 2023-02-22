@@ -21,7 +21,7 @@
         "optimization":{
             "n_iters" : 250000,
             "learning_rate" : 2e-4,
-            "batch_size_per_gpu" : 8
+            "batch_size_per_gpu" : 1
         },
         "loss":{
             "ell_p":1,
