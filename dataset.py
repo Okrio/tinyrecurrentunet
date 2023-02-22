@@ -164,7 +164,7 @@ class DataProcessing:
                           self.perm(imag_demod.requires_grad_(False))), dim = 1)
        
         #normalaise data
-        data = self.normalise(data)
+        #data = self.normalise(data)
         
         #returns data of structure (time_frame, 4 features, freq_bins)
         return data
