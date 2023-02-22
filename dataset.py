@@ -70,7 +70,7 @@ class DataProcessing:
 
         #construct complex spectrogram
         complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
-        return complex_spectrogram
+        return complex_spectrogram.unsqueeze(0)
 
 
 
@@ -125,7 +125,12 @@ class DataProcessing:
                             n_fft=self.n_fft, 
                             hop_length=self.hop_length,
                             return_complex=True)
-            
+
+    def normalise(self, data):
+        return torch.nn.functional.normalize(data, 
+                                             p=2.0, 
+                                             dim=data.shape[-1], 
+                                             eps=1e-12)   
 
     def _pcen(self, signal):
         x = self.pcen(signal)
@@ -157,6 +162,9 @@ class DataProcessing:
                           self.perm(pcen).detach(),
                           self.perm(real_demod.requires_grad_(False)),
                           self.perm(imag_demod.requires_grad_(False))), dim = 1)
+       
+        #normalaise data
+        data = self.normalise(data)
         
         #returns data of structure (time_frame, 4 features, freq_bins)
         return data
