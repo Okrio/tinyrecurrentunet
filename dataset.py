@@ -176,7 +176,7 @@ class CleanNoisyPairDataset(Dataset):
         super(CleanNoisyPairDataset).__init__()
         
 
-        self.dp = DataPreprocessing()
+        self.dp = DataProcessing()
         
         assert subset is None or subset in ["training", "testing"]
         self.crop_length_sec = crop_length_sec
