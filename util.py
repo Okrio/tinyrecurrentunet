@@ -221,9 +221,8 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
                             denoised_real, 
                             denoised_imag)
     
-    #Spectrogram to waveform
-    denoised_audio = dp.istft(modulate)
-    
+    #Spectrogram to Waveform
+    denoised_audio = dp.istft(modulate.permute(0, 2, 1))
 
     # AE loss
     #if ell_p == 2: #L2 loss
