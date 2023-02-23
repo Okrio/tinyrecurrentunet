@@ -156,7 +156,6 @@ class LinearWarmupCosineDecay:
 
 
 #model utls
-
 def std_normal(size):
     """
     Generate the standard Gaussian variable of a certain size
@@ -223,7 +222,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     
     #Spectrogram to Waveform
     denoised_audio = dp.istft(modulate.permute(0, 2, 1))
-
+    print(denoised_audio.shape)
     # AE loss
     #if ell_p == 2: #L2 loss
     #    ae_loss = nn.MSELoss()(denoised_audio, clean_audio)
@@ -233,9 +232,9 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     #    raise NotImplementedError
     
     # Cosine Similarity Loss
-    cs_loss = cs(denoised_audio, clean_audio)
+    cs_loss = cs(denoised_audio, clean_audio.squeeze(0))
 
-    loss += cs_loss #* ell_p_lambda
+    loss += cs_loss.cuda() #* ell_p_lambda
     output_dic["cos_sim_loss"] = cs_loss.data * ell_p_lambda
     
     #multi resolution short-time fourier transform loss
