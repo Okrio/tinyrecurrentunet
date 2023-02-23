@@ -164,7 +164,7 @@ def train(num_gpus,
                 print('model at iteration %s is saved' % n_iter)
             '''
             n_iter += 1
-            if n_iters == 500:
+            if n_iter == 500:
                     print('ok')
     # After training, close TensorBoard.
     if rank == 0:
