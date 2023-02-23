@@ -222,7 +222,6 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     
     #Spectrogram to Waveform
     denoised_audio = dp.istft(modulate.permute(0, 2, 1))
-    print(denoised_audio.shape)
     # AE loss
     #if ell_p == 2: #L2 loss
     #    ae_loss = nn.MSELoss()(denoised_audio, clean_audio)
@@ -239,7 +238,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     
     #multi resolution short-time fourier transform loss
     if stft_lambda > 0:
-        sc_loss, mag_loss = mrstftloss(denoised_audio.squeeze(1), clean_audio.squeeze(1))
+        sc_loss, mag_loss = mrstftloss(denoised_audio, clean_audio.squeeze(0))
         loss += (sc_loss + mag_loss) * stft_lambda
         output_dic["stft_sc"] = sc_loss.data * stft_lambda
         output_dic["stft_mag"] = mag_loss.data * stft_lambda
