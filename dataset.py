@@ -87,11 +87,9 @@ class DataProcessing:
     def mod_phase(self, magnitude, real_demod, imag_demod):
         """
         Reverse operation of demodulation
-
         Args:
           real_demod(float32): real part of the demodulated signal
           imag_demod(float32): imaginary part of the demodulated signal
-
         Returns:
           Spectrogram(comeplx64)
         
@@ -109,10 +107,8 @@ class DataProcessing:
         
         '''
         Calculates demodulated phase of real and imaginary
-
         Args:
             spectrogram
-
         Returns:
             real_demod (float32):   Demodulated phase of real
             imag_demod (float32):   Demodulated phase of imaginary
@@ -219,8 +215,15 @@ class CleanNoisyPairDataset(Dataset):
     def __init__(self, root='./', subset='training', crop_length_sec=0):
         super(CleanNoisyPairDataset).__init__()
         
-
-        self.dp = DataProcessing()
+        self.n_fft = 512
+        self.n_mels = self.n_fft // 2 + 1
+        self.hop_length = 128
+        self.sample_rate = 16000
+        self.mel = torchaudio.transforms.MelSpectrogram(sample_rate=self.sample_rate, 
+                                                        n_mels = self.n_mels, 
+                                                        n_fft = self.n_fft, 
+                                                        hop_length = self.hop_length)
+        self.atob = torchaudio.transforms.AmplitudeToDB(stype="amplitude", top_db=80)        
         
         assert subset is None or subset in ["training", "testing"]
         self.crop_length_sec = crop_length_sec
@@ -273,19 +276,132 @@ class CleanNoisyPairDataset(Dataset):
             noisy_audio = noisy_audio[start:(start + crop_length)]
 
         #prepare audio signal and spectrogram data pairs
-        clean_audio, noisy_audio = clean_audio.unsqueeze(0), noisy_audio.unsqueeze(0)
-        clean_features, noisy_features = self.dp(clean_audio), self.dp(noisy_audio)
+        clean_audio, noisy_audio = clean_audio.unsqueeze(0), noisy_audio.unsqueeze(0)        
+        clean_features, noisy_features = self.perprocess(clean_audio), self.perprocess(noisy_audio)
         
         #make input shape suitable for network
-        return (clean_features, noisy_features, 
-                clean_audio, noisy_audio, 
-                fileid)
+        return (clean_features, noisy_features, clean_audio, noisy_audio, fileid)
 
-    
+
     def __len__(self):
         return len(self.files)
 
+    
+    
+    def mod_phase(self, magnitude, real_demod, imag_demod):
+        """
+        Reverse operation of demodulation
+        Args:
+          real_demod(float32): real part of the demodulated signal
+          imag_demod(float32): imaginary part of the demodulated signal
+        Returns:
+          Spectrogram(comeplx64)
+        
+        """
+        #wrap phase back its original state 
+        wrap = torch.arctan2(real_demod, imag_demod)
 
+        #construct complex spectrogram
+        complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
+        return complex_spectrogram.unsqueeze(0)
+
+
+
+    def _demod_phase(self, spectrogram):
+        
+        '''
+        Calculates demodulated phase of real and imaginary
+        Args:
+            spectrogram
+        Returns:
+            real_demod (float32):   Demodulated phase of real
+            imag_demod (float32):   Demodulated phase of imaginary
+        '''
+
+        phase = torch.angle(spectrogram)
+        phase = phase.squeeze(0).detach().numpy() #to numpy 
+        
+        #calculate demodulated phase
+        demodulated_phase = np.unwrap(phase)
+        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0)
+        
+        #get real and imagniary parts of the demodulated phase
+        real_demod = torch.sin(demodulated_phase)
+        imag_demod = torch.cos(demodulated_phase)
+
+        return real_demod, imag_demod
+
+
+    def log_mag(self, spectrogram):
+        x = torch.log(torch.abs(spectrogram) +1e-9)
+        return x
+
+
+    def istft(self, spectrogram):
+        """
+        Compute inverse short-time fourier transform
+        """
+        return torch.istft(spectrogram,
+                             n_fft=self.n_fft,
+                             hop_length=self.hop_length)
+    
+    def _stft(self, signal):
+
+        '''
+        Compute complex form short-time fourier transform
+        '''
+        return torch.stft(signal, 
+                            n_fft=self.n_fft, 
+                            hop_length=self.hop_length,
+                            return_complex=True)
+            
+
+    def _pcen(self, signal):
+        #construct spectrogram complex --> float32
+        mel = self.mel(signal)
+        amp_to_db = self.atob(mel)
+        to_pcen = pcenfunc(mel.permute((0,2,1)))
+        return to_pcen.permute((0, 2, 1))
+   
+    def perm(self, tensor):
+        '''
+        permute function
+        '''
+        return tensor.permute(2, 0, 1)
+    
+    def normalise(self, audio):
+        audio = audio.squeeze(0)
+        mean = torch.mean(audio)
+        std = torch.std(audio)
+        norm_audio = (audio - mean) / std
+        return norm_audio.unsqueeze(0)
+
+    def perprocess(self, audio):
+
+        #normalise audio
+        #audio = self.normalise(audio)
+        
+        #get spectrogram from audio
+        spectrogram = self._stft(audio)
+
+        #calculate log-magnitude, real and imaginary part of demodulcated phase
+        log_magnitude = self.log_mag(spectrogram)
+        real_demod, imag_demod = self._demod_phase(spectrogram)
+
+        #calculate PCEN
+        pcen = self._pcen(audio)
+        
+        #concatenate and permute data to be fed to the network 
+        data = torch.cat((self.perm(log_magnitude),
+                          self.perm(pcen),
+                          self.perm(real_demod),
+                          self.perm(imag_demod)), dim = 1)
+        
+        
+        data = torch.nn.functional.normalize(data, dim=0)
+        #returns data of structure (time_frame, 4 features, freq_bins)
+        return data
+        
 def load_CleanNoisyPairDataset(root,
                                subset,
                                crop_length_sec,
@@ -335,4 +451,4 @@ if __name__ == '__main__':
         
         print(clean_feat.shape, noisy_audio.shape, fileid)
         print(clean_audio.shape, noisy_audio.shape, fileid)
-        break       
+        break  
