@@ -28,7 +28,7 @@ def train(num_gpus,
           exp_path, 
           log, 
           optimization, 
-          loss):
+          loss_config):
 
     # setup local experiment path
     if rank == 0:
@@ -110,14 +110,14 @@ def train(num_gpus,
                     phase=('linear', 'cosine'),
                 )
 
-    if loss["stft_lambda"] > 0:
-        mrstftloss = MultiResolutionSTFTLoss(**loss["stft_config"]).cuda()
+    if loss_config["stft_lambda"] > 0:
+        mrstftloss = MultiResolutionSTFTLoss(**loss_config["stft_config"]).cuda()
     else:
         mrstftloss = None
 
     while n_iter < optimization["n_iters"] + 1:
+        
         # for each epoch
-
         for clean_feat, noisy_feat, clean_audio, noisy_audio, fileid in trainloader: 
             
             #load data and send to device
@@ -130,7 +130,7 @@ def train(num_gpus,
             optimizer.zero_grad()
             X = (clean_feat, noisy_feat, clean_audio)
             
-            loss, loss_dic = loss_fn(net, X, **loss, mrstftloss=mrstftloss)
+            loss, loss_dic = loss_fn(net, X, **loss_config, mrstftloss=mrstftloss)
             if num_gpus > 1:
                 reduced_loss = reduce_tensor(loss.data, num_gpus).item()
             else:
@@ -152,7 +152,7 @@ def train(num_gpus,
                     tb.add_scalar("Train/Train-Reduced-Loss", reduced_loss, n_iter)
                     tb.add_scalar("Train/Gradient-Norm", grad_norm, n_iter)
                     tb.add_scalar("Train/learning-rate", optimizer.param_groups[0]["lr"], n_iter)
-
+            '''
             # save checkpoint
             if n_iter > 0 and n_iter % log["iters_per_ckpt"] == 0 and rank == 0:
                 checkpoint_name = '{}.pkl'.format(n_iter)
@@ -162,9 +162,10 @@ def train(num_gpus,
                             'training_time_seconds': int(time.time()-time0)}, 
                             os.path.join(ckpt_directory, checkpoint_name))
                 print('model at iteration %s is saved' % n_iter)
-
+            '''
             n_iter += 1
-
+            if n_iter > 500:
+              print(n_iter)
     # After training, close TensorBoard.
     if rank == 0:
         tb.close()
