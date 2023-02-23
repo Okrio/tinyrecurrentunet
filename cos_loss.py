@@ -39,9 +39,8 @@ class CosSimLoss(nn.Module):
     
     
     def forward(self, x, y):
-        x = x.squeeze(0)
-        y = y.unsqueeze(0)
-                       
+        print(x.shape)
+        print(y.shape)              
         loss = []
         for i in range(len(self.g)):     
           if i == 0:
