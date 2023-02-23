@@ -23,7 +23,7 @@
             "learning_rate" : 2e-4,
             "batch_size_per_gpu" : 1
         },
-        "loss":{
+        "loss_config":{
             "ell_p":1,
             "ell_p_lambda":1,
             "stft_lambda":1,
@@ -39,7 +39,7 @@
     },
     
     "trainset" : {
-        "root": "/content/content/MyDrive/Insone/DSNDataset",
+        "root": "/content/content/MyDrive/Insone/DSNDataset/",
         "crop_length_sec": 2,
         "sample_rate":48000
     },
