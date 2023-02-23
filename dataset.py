@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import librosa
-import pcen
 
 from scipy.io.wavfile import read as wavread
 import warnings
@@ -21,7 +20,6 @@ np.random.seed(0)
 
 from torchvision import datasets, models, transforms
 import torchaudio
-import pcen
 
 
 
@@ -103,7 +101,7 @@ class DataProcessing:
 
         #construct complex spectrogram
         complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
-        return complex_spectrogram
+        return complex_spectrogram.unsqueeze(0)
 
 
 
@@ -135,7 +133,7 @@ class DataProcessing:
 
 
     def log_mag(self, spectrogram):
-        x = torch.log(torch.abs(spectrogram)+1e-9)
+        x = torch.log(torch.abs(spectrogram) +1e-9)
         return x
     
     
@@ -258,11 +256,11 @@ class CleanNoisyPairDataset(Dataset):
 
     
 
-    def __getitem(self, n):
+    def __getitem__(self, n):
         fileid = self.files[n]
-        clean_audio, sample_rate = librosa.load(fileid[0])
-        noisy_audio, sample_rate = librosa.load(fileid[1])
-        clean_audio, noisy_audio = clean_audio, noisy_audio
+        clean_audio, sample_rate = torchaudio.load(fileid[0])
+        noisy_audio, sample_rate = torchaudio.load(fileid[1])
+        clean_audio, noisy_audio = clean_audio.squeeze(0), noisy_audio.squeeze(0)
         assert len(clean_audio) == len(noisy_audio)
 
         crop_length = int(self.crop_length_sec * sample_rate)
@@ -275,7 +273,7 @@ class CleanNoisyPairDataset(Dataset):
             noisy_audio = noisy_audio[start:(start + crop_length)]
 
         #prepare audio signal and spectrogram data pairs
-        clean_audio, noisy_audio = clean_audio, noisy_audio
+        clean_audio, noisy_audio = clean_audio.unsqueeze(0), noisy_audio.unsqueeze(0)
         clean_features, noisy_features = self.dp(clean_audio), self.dp(noisy_audio)
         
         #make input shape suitable for network
@@ -303,16 +301,16 @@ def load_CleanNoisyPairDataset(root,
         
         if num_gpus > 1:
             train_sampler = DistributedSampler(dataset)
-            dataloader = torch.utils.data.Dataloader(dataset, sampler=train_sampler, **kwargs)
+            dataloader = torch.utils.data.DataLoader(dataset, sampler=train_sampler, **kwargs)
         else:
-            dataloader = torch.utils.data.Dataloader(dataset, sampler=None, shuffle=True, **kwargs)
+            dataloader = torch.utils.data.DataLoader(dataset, sampler=None, shuffle=True, **kwargs)
         
         return dataloader
 
 
 if __name__ == '__main__':
     import json
-    with open('./configs/tiny.json') as f:
+    with open('/content/tinyrecurrentunet/config/tiny.json') as f:
         data = f.read()
     config = json.loads(data)
     trainset_config = config('train')
