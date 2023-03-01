@@ -12,7 +12,7 @@ pip install -r requirements.txt
 
 ## Dataset
 
-- The code uses [Microsoft DNS 2020](https://arxiv.org/ftp/arxiv/papers/2005/2005.13981.pdf) dataset. The dataset, pre-processing codes, and instruction to generate training data can be found in [this link](https://github.com/microsoft/DNS-Challenge/tree/interspeech2020/master). Assume the dataset is stored under ```./dns```. Prior to generating clean-noisy data pairs, to comply with the paper's configurations, the following parameters in their ```noisyspeech_synthesizer.cfg``` file: 
+- The code uses [Microsoft DNS 2020](https://arxiv.org/ftp/arxiv/papers/2005/2005.13981.pdf) dataset. The dataset, pre-processing codes, and instruction to generate training data can be found in [this link](https://github.com/microsoft/DNS-Challenge/tree/interspeech2020/master). Assume the dataset is stored under ```./dns```. Prior to generating clean-noisy data pairs, to comply with the paper's configurations, alter the following parameters in their ```noisyspeech_synthesizer.cfg``` file: 
 ```
 total_hours: 300, 
 snr_lower: -5, 
@@ -32,8 +32,20 @@ Generate training data:
 ```
 python noisyspeech_synthesizer_singleprocess.py
 ```
+
+Now we assume that the structure of the dataset folder is:
+```
+Training set: 
+.../dns/training_set/clean/fileid_{0..49999}.wav
+.../dns/training_set/noisy/fileid_{0..49999}.wav
+.../dns/training_set/noise/fileid_{0..49999}.wav
+```
+
 ## Training
 
+The ```tiny.json``` file complies with the paper's configurations. Should you wish to initiate training with a different set of configurations, create ```.json``` file inf the ```configs``` directory or simply modify the paramteres in the pre-existing file. To initiate training run:
+
+```python3 distributed.py -c configs/tiny.json```
 
 
 ## Denoising
