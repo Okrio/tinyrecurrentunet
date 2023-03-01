@@ -229,10 +229,10 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     clean_audio = dp.istft(modulate_clean.permute(0, 2, 1))
     
     # Cosine Similarity Loss
-    cs_loss = cs(denoised_audio, clean_audio)
+    #cs_loss = cs(denoised_audio, clean_audio)
 
-    loss += cs_loss.cuda() #* ell_p_lambda
-    output_dic["cos_sim_loss"] = cs_loss.data * ell_p_lambda
+    #loss += cs_loss.cuda() #* ell_p_lambda
+    #output_dic["cos_sim_loss"] = cs_loss.data * ell_p_lambda
     
     #multi resolution short-time fourier transform loss
     if stft_lambda > 0:
