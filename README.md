@@ -2,7 +2,7 @@
 
 Unofficial implementation of [REAL-TIME DENOISING AND DEREVERBERATION WTIH TINY RECURRENT U-NET](https://arxiv.org/pdf/2102.03207.pdf) in PyTorch. Tiny Recurrent U-Net (TRU-Net) is a lightweight online inference model that matches the performance of current (23 Jun 2021) state-of-the-art models. The size of the quantized version of TRU-Net is 362 kilobytes (~300k parameters), which is small enough to be deployed on edge devices. In addition, the small-sized model with a new masking method called phase-aware β-sigmoid mask enables simultaneous denoising and dereverberation.
 
-Colab notebook: [![colab_badge](https://colab.research.google.com/drive/1jd9J3lLSZrmz3hBd372NPV_9u7JQjoX-#scrollTo=9t0DwRNxeRhp)
+Colab notebook: [![colab_badge](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1jd9J3lLSZrmz3hBd372NPV_9u7JQjoX-#scrollTo=9t0DwRNxeRhp)
 
 ## Requirements
 
