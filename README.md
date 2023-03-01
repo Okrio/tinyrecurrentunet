@@ -13,3 +13,16 @@ Training set directory:
 ./training_dataset/noisy/fileid_{0..10000}.wav
 ./training_dataset/noise/fileid_{0..10000}.wav
 ```
+
+## Training
+
+
+
+## Denoising
+
+
+## Evaluation
+
+
+## 
+
