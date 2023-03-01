@@ -205,7 +205,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     #Get noisy/clean specs and audio pairs
     clean_feat, noisy_feat = X
 
-    B, C, L = clean_audio.shape
+    #B, C, L = clean_audio.shape
     output_dic = {}
     loss = 0.0
     
@@ -216,13 +216,17 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
     
     #reverse function of demodulate
-    modulate = dp.mod_phase(denoised_mag, 
+    modulate_denoised = dp.mod_phase(denoised_mag, 
                             denoised_real, 
                             denoised_imag)
     
+    clean_feat = clean_feat.squeeze(0)
+    modulate_clean = dp.mod_phase(clean_feat.permute(1, 0, 2)[0],
+                                  clean_feat.permute(1, 0, 2)[2],
+                                  clean_feat.permute(1, 0, 2)[3])
     #Spectrogram to Waveform
-    denoised_audio = dp.istft(modulate.permute(0, 2, 1))
-    clean_audio = dp.istft(clean_feat)
+    denoised_audio = dp.istft(modulate_denoised.permute(0, 2, 1))
+    clean_audio = dp.istft(modulate_clean.permute(0, 2, 1))
     
     # Cosine Similarity Loss
     cs_loss = cs(denoised_audio, clean_audio)
