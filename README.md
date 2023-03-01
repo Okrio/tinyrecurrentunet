@@ -46,7 +46,7 @@ Training set:
 
 ## Training
 
-The ```tiny.json``` file complies with the paper's configurations. Should you wish to initiate training with a different set of configurations, create ```.json``` file in the ```configs``` directory or simply modify the paramteres in the pre-existing file. To initiate training run:
+The ```tiny.json``` file complies with the paper's configurations. Should you wish to initiate training with a different set of configurations, create ```.json``` file in the ```configs``` directory or simply modify the paramteres in the pre-existing file. We recommend leaving the network hyperparameters untouched if faithfull replication of the model size is intended. To initiate training run:
 
 ```
 python3 distributed.py -c config/tiny.json
