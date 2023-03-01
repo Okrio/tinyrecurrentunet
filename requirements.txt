@@ -14,3 +14,10 @@ pandas
 math
 logging
 onnxruntime
+torch
+torchvision
+torchaudio
+scipy
+pesq
+pystoi
+tqdm
