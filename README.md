@@ -46,7 +46,7 @@ Training set:
 The ```tiny.json``` file complies with the paper's configurations. Should you wish to initiate training with a different set of configurations, create ```.json``` file in the ```configs``` directory or simply modify the paramteres in the pre-existing file. To initiate training run:
 
 ```
-python3 distributed.py -c configs/tiny.json
+python3 distributed.py -c config/tiny.json
 ```
 
 The model recieves data with shape of (Time-step, 4, Frequency) where dimension one encomapasses a channel-wise concatenation of log-magnitude spectrogram, PCEN spectrogram, and real/imaginary part of demodulated phase respectively. To compensate memory over-load, our code utilises the aforementiond data information to reconstruct time-domain audio in order to calculate Multi-Resolution STFT Loss instead loading audio file pairs on the GPU.
