@@ -127,7 +127,7 @@ def train(num_gpus,
 
             #forward propegation and loss calculation
             optimizer.zero_grad()
-            X = (clean_feat, noisy_feat, clean_audio)
+            X = (clean_feat, noisy_feat)
             
             loss, loss_dic = loss_fn(net, X, **loss_config, mrstftloss=mrstftloss)
             if num_gpus > 1:
