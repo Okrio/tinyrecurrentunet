@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import librosa
-import torch.nn.init as init
 
 
 class StandardConv1d(nn.Module):
@@ -119,35 +117,22 @@ class LastTrCNN(nn.Module):
         return output
 
 class TRUNet(nn.Module):
-    def __init__(self,
-                input_size,
-                channels_input,
-                channels_output,
-                channels_hidden,
-                kernel_sizes,
-                strides,
-                tr_channels_input
-    ):
+    def __init__(self):
         super(TRUNet, self).__init__()
-        #Encoder
-        self.down1 = StandardConv1d(input_size, channels_input , kernel_sizes[0], strides[0])
-        self.down2 = DepthwiseSeparableConv1d(channels_input, channels_hidden, kernel_sizes[1], strides[1])
-        self.down3 = DepthwiseSeparableConv1d(channels_hidden, channels_hidden, kernel_sizes[0], strides[0])
-        self.down4 = DepthwiseSeparableConv1d(channels_hidden, channels_hidden, kernel_sizes[1], strides[1])
-        self.down5 = DepthwiseSeparableConv1d(channels_hidden, channels_hidden, kernel_sizes[0], strides[0])
-        self.down6 = DepthwiseSeparableConv1d(channels_hidden, channels_hidden, kernel_sizes[1], strides[0])
-        
-        #Bottleneck
-        self.FGRU = GRUBlock(channels_hidden, channels_hidden//2, channels_hidden//2, bidirectional=True)
-        self.TGRU = GRUBlock(channels_hidden//2, channels_hidden, channels_hidden//2, bidirectional=False)
-        
-        #Decoder
-        self.up1 = FirstTrCNN(channels_hidden//2, channels_hidden//2, kernel_sizes[1], strides[0])
-        self.up2 = TrCNN(tr_channels_input, channels_hidden//2, kernel_sizes[0], strides[0])
-        self.up3 = TrCNN(tr_channels_input, channels_hidden//2, kernel_sizes[1], strides[1])
-        self.up4 = TrCNN(tr_channels_input, channels_hidden//2, kernel_sizes[0], strides[0])
-        self.up5 = TrCNN(tr_channels_input, channels_hidden//2, kernel_sizes[1], strides[1])
-        self.up6 = LastTrCNN(channels_hidden, channels_output, kernel_sizes[0], strides[0])
+        self.down1 = StandardConv1d(4,64,5,2)
+        self.down2 = DepthwiseSeparableConv1d(64, 128, 3, 1)
+        self.down3 = DepthwiseSeparableConv1d(128, 128, 5, 2)
+        self.down4 = DepthwiseSeparableConv1d(128, 128, 3, 1)
+        self.down5 = DepthwiseSeparableConv1d(128, 128, 5, 2)
+        self.down6 = DepthwiseSeparableConv1d(128, 128, 3, 2)
+        self.FGRU = GRUBlock(128, 64, 64, bidirectional=True)
+        self.TGRU = GRUBlock(64, 128, 64, bidirectional=False)
+        self.up1 = FirstTrCNN(64, 64, 3, 2)
+        self.up2 = TrCNN(192, 64, 5, 2)
+        self.up3 = TrCNN(192, 64, 3, 1)
+        self.up4 = TrCNN(192, 64, 5, 2)
+        self.up5 = TrCNN(192, 64, 3, 1)
+        self.up6 = LastTrCNN(128, 5, 5, 2)
   
 
     def forward(self, x):
@@ -157,13 +142,10 @@ class TRUNet(nn.Module):
         x4 = self.down4(x3)
         x5 = self.down5(x4)
         x6 = self.down6(x5)
-        
         x7 = x6.transpose(1,2)
         x8 = self.FGRU(x7)
-        
         x9 = x8.transpose(1,2)
         x10 = self.TGRU(x9)
-        
         x11 = self.up1(x10)
         x12 = self.up2(x11,x5)
         x13 = self.up3(x12,x4)
