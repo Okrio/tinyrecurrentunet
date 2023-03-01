@@ -117,7 +117,14 @@ class LastTrCNN(nn.Module):
         return output
 
 class TRUNet(nn.Module):
-    def __init__(self):
+    def __init__(self,
+                input_size,
+                channels_input,
+                channels_output,
+                channels_hidden,
+                kernel_sizes,
+                strides,
+                tr_channels_input):
         super(TRUNet, self).__init__()
         self.down1 = StandardConv1d(4,64,5,2)
         self.down2 = DepthwiseSeparableConv1d(64, 128, 3, 1)
