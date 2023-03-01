@@ -280,7 +280,7 @@ class CleanNoisyPairDataset(Dataset):
         clean_features, noisy_features = self.perprocess(clean_audio), self.perprocess(noisy_audio)
         
         #make input shape suitable for network
-        return (clean_features, noisy_features, clean_audio, noisy_audio, fileid)
+        return (clean_features, noisy_features, fileid)
 
 
     def __len__(self):
