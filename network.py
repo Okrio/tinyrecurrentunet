@@ -129,20 +129,25 @@ class TRUNet(nn.Module):
                 tr_channels_input
     ):
         super(TRUNet, self).__init__()
-        self.down1 = StandardConv1d(4,64,5,2)
-        self.down2 = DepthwiseSeparableConv1d(64, 128, 3, 1)
-        self.down3 = DepthwiseSeparableConv1d(128, 128, 5, 2)
-        self.down4 = DepthwiseSeparableConv1d(128, 128, 3, 1)
-        self.down5 = DepthwiseSeparableConv1d(128, 128, 5, 2)
-        self.down6 = DepthwiseSeparableConv1d(128, 128, 3, 2)
-        self.FGRU = GRUBlock(128, 64, 64, bidirectional=True)
-        self.TGRU = GRUBlock(64, 128, 64, bidirectional=False)
-        self.up1 = FirstTrCNN(64, 64, 3, 2)
-        self.up2 = TrCNN(192, 64, 5, 2)
-        self.up3 = TrCNN(192, 64, 3, 1)
-        self.up4 = TrCNN(192, 64, 5, 2)
-        self.up5 = TrCNN(192, 64, 3, 1)
-        self.up6 = LastTrCNN(128, 4, 5, 2)
+        #Encoder
+        self.down1 = StandardConv1d(input_size, channels_input , kernel_sizes[0], strides[0])
+        self.down2 = DepthwiseSeparableConv1d(channels_input, channels_hidden, kernel_sizes[1], strides[1])
+        self.down3 = DepthwiseSeparableConv1d(channels_hidden, channels_hidden, kernel_sizes[0], strides[0])
+        self.down4 = DepthwiseSeparableConv1d(channels_hidden, channels_hidden, kernel_sizes[1], strides[1])
+        self.down5 = DepthwiseSeparableConv1d(channels_hidden, channels_hidden, kernel_sizes[0], strides[0])
+        self.down6 = DepthwiseSeparableConv1d(channels_hidden, channels_hidden, kernel_sizes[1], strides[0])
+        
+        #Bottleneck
+        self.FGRU = GRUBlock(channels_hidden, channels_hidden//2, channels_hidden//2, bidirectional=True)
+        self.TGRU = GRUBlock(channels_hidden//2, channels_hidden, channels_hidden//2, bidirectional=False)
+        
+        #Decoder
+        self.up1 = FirstTrCNN(channels_hidden//2, channels_hidden//2, kernel_sizes[1], strides[0])
+        self.up2 = TrCNN(tr_channels_input, channels_hidden//2, kernel_sizes[0], strides[0])
+        self.up3 = TrCNN(tr_channels_input, channels_hidden//2, kernel_sizes[1], strides[1])
+        self.up4 = TrCNN(tr_channels_input, channels_hidden//2, kernel_sizes[0], strides[0])
+        self.up5 = TrCNN(tr_channels_input, channels_hidden//2, kernel_sizes[1], strides[1])
+        self.up6 = LastTrCNN(channels_hidden, channels_output, kernel_sizes[0], strides[0])
   
 
     def forward(self, x):
