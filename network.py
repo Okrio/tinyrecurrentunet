@@ -139,7 +139,7 @@ class TRUNet(nn.Module):
         self.up3 = TrCNN(192, 64, 3, 1)
         self.up4 = TrCNN(192, 64, 5, 2)
         self.up5 = TrCNN(192, 64, 3, 1)
-        self.up6 = LastTrCNN(128, 5, 5, 2)
+        self.up6 = LastTrCNN(128, 4, 5, 2)
   
 
     def forward(self, x):
