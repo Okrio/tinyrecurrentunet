@@ -151,7 +151,7 @@ def train(num_gpus,
                     tb.add_scalar("Train/Train-Reduced-Loss", reduced_loss, n_iter)
                     tb.add_scalar("Train/Gradient-Norm", grad_norm, n_iter)
                     tb.add_scalar("Train/learning-rate", optimizer.param_groups[0]["lr"], n_iter)
-            '''
+            
             # save checkpoint
             if n_iter > 0 and n_iter % log["iters_per_ckpt"] == 0 and rank == 0:
                 checkpoint_name = '{}.pkl'.format(n_iter)
@@ -161,9 +161,8 @@ def train(num_gpus,
                             'training_time_seconds': int(time.time()-time0)}, 
                             os.path.join(ckpt_directory, checkpoint_name))
                 print('model at iteration %s is saved' % n_iter)
-            '''
-            n_iter += 1
             print(n_iter)
+            n_iter += 1
     # After training, close TensorBoard.
     if rank == 0:
         tb.close()
