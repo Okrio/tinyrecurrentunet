@@ -203,7 +203,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     assert type(X) == tuple and len(X) == 3
     
     #Get noisy/clean specs and audio pairs
-    clean_feat, noisy_feat, clean_audio = X
+    clean_feat, noisy_feat = X
 
     B, C, L = clean_audio.shape
     output_dic = {}
@@ -222,23 +222,17 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     
     #Spectrogram to Waveform
     denoised_audio = dp.istft(modulate.permute(0, 2, 1))
-    # AE loss
-    #if ell_p == 2: #L2 loss
-    #    ae_loss = nn.MSELoss()(denoised_audio, clean_audio)
-    #elif ell_p == 1: #L1 loss
-    #    ae_loss = F.l1_loss(denoised_audio, clean_audio)
-    #else:
-    #    raise NotImplementedError
+    clean_audio = dp.istft(clean_feat)
     
     # Cosine Similarity Loss
-    cs_loss = cs(denoised_audio, clean_audio.squeeze(0))
+    cs_loss = cs(denoised_audio, clean_audio)
 
     loss += cs_loss.cuda() #* ell_p_lambda
     output_dic["cos_sim_loss"] = cs_loss.data * ell_p_lambda
     
     #multi resolution short-time fourier transform loss
     if stft_lambda > 0:
-        sc_loss, mag_loss = mrstftloss(denoised_audio, clean_audio.squeeze(0))
+        sc_loss, mag_loss = mrstftloss(denoised_audio, clean_audio)
         loss += (sc_loss + mag_loss) * stft_lambda
         output_dic["stft_sc"] = sc_loss.data * stft_lambda
         output_dic["stft_mag"] = mag_loss.data * stft_lambda
