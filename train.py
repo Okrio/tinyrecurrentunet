@@ -118,12 +118,11 @@ def train(num_gpus,
     while n_iter < optimization["n_iters"] + 1:
         
         # for each epoch
-        for clean_feat, noisy_feat, clean_audio, noisy_audio, fileid in trainloader: 
+        for clean_feat, noisy_feat, fileid in trainloader: 
             
             #load data and send to device
             clean_feat = clean_feat.cuda()
             noisy_feat = noisy_feat.cuda()
-            clean_audio = clean_audio.cuda()
             
 
             #forward propegation and loss calculation
