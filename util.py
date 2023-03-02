@@ -11,11 +11,9 @@ import torch.nn.functional as F
 import torchaudio
 
 from stft_loss import MultiResolutionSTFTLoss
-from dataset import DataProcessing
 from cos_loss import CosSimLoss
 
-#instantiate Dataprocessing and Cosine Similarity Loss classes
-dp = DataProcessing()
+#instantiate Cosine Similarity Loss classes
 cs = CosSimLoss()
 
 
