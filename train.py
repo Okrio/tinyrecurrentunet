@@ -162,7 +162,6 @@ def train(num_gpus,
                             os.path.join(ckpt_directory, checkpoint_name))
                 print('model at iteration %s is saved' % n_iter)
             n_iter += 1
-            print(n_iter)
     # After training, close TensorBoard.
     if rank == 0:
         tb.close()
