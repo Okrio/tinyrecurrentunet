@@ -240,33 +240,31 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     
     #forward prop
     denoised_feat = net(noisy_feat.squeeze(0))  
-    denoised_audio = denoised_feat
+    
     #convert features back to time-domain
-    #denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
+    denoised_mag, _, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
     
     #reverse function of demodulate
-    #modulate_denoised = mod_phase(denoised_mag, 
+    modulate_denoised = mod_phase(denoised_mag, 
                             denoised_real, 
                             denoised_imag)
     
-    #clean_feat = clean_feat.squeeze(0)
-    #modulate_clean = mod_phase(clean_feat.permute(1, 0, 2)[0],
+    modulate_clean = mod_phase(clean_feat.permute(1, 0, 2)[0],
                                clean_feat.permute(1, 0, 2)[2],
                                clean_feat.permute(1, 0, 2)[3])
     #Spectrogram to Waveform
-    #denoised_audio = istft(modulate_denoised.permute(0, 2, 1))
-    #clean_audio = istft(modulate_clean.permute(0, 2, 1))
+    denoised_audio = istft(modulate_denoised.permute(0, 2, 1))
+    clean_audio = istft(modulate_clean.permute(0, 2, 1))
     
-    clean_audio = clean_feat
     # Cosine Similarity Loss
-    cs_loss = cs(denoised_audio, clean_audio.squeeze(0))
+    cs_loss = cs(denoised_audio, clean_audio)
 
     loss += cs_loss.cuda() #* ell_p_lambda
     output_dic["cos_sim_loss"] = cs_loss.data * ell_p_lambda
     
     #multi resolution short-time fourier transform loss
     if stft_lambda > 0:
-        sc_loss, mag_loss = mrstftloss(denoised_audio, clean_audio.squeeze(0))
+        sc_loss, mag_loss = mrstftloss(denoised_audio, clean_audio)
         loss += (sc_loss + mag_loss) * stft_lambda
         output_dic["stft_sc"] = sc_loss.data * stft_lambda
         output_dic["stft_mag"] = mag_loss.data * stft_lambda
