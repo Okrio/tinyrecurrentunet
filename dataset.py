@@ -363,8 +363,7 @@ class CleanNoisyPairDataset(Dataset):
         to_pcen = pcenfunc(mel.permute((0,2,1)))
         return to_pcen.permute((0, 2, 1))
    
-    d
-    ef perm(self, tensor):
+    def perm(self, tensor):
         '''
         permute function
         '''
