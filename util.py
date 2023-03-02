@@ -248,7 +248,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     modulate_denoised = mod_phase(denoised_mag, 
                             denoised_real, 
                             denoised_imag)
-    
+    clean_feat = clean_feat.squeeze(0)
     modulate_clean = mod_phase(clean_feat.permute(1, 0, 2)[0],
                                clean_feat.permute(1, 0, 2)[2],
                                clean_feat.permute(1, 0, 2)[3])
