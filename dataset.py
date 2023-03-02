@@ -399,7 +399,8 @@ class CleanNoisyPairDataset(Dataset):
                           self.perm(imag_demod)), dim = 1)
         
         
-        #data = torch.nn.functional.normalize(data, dim=0)
+        data = torch.nn.functional.normalize(data, dim=0)
+        
         #returns data of structure (time_frame, 4 features, freq_bins)
         return data
         
