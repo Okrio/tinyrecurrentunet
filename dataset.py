@@ -387,8 +387,8 @@ class CleanNoisyPairDataset(Dataset):
 
         #calculate log-magnitude, real and imaginary part of demodulcated phase
         log_magnitude = self.log_mag(spectrogram)
-        real_demod, imag_demod = self._demod_phase(spectrogram)
-
+        #real_demod, imag_demod = self._demod_phase(spectrogram)
+        real_demod, imag_demod = torch.randn((1, 257, 751)), torch.randn((1, 257, 751))
         #calculate PCEN
         pcen = self._pcen(audio)
         
