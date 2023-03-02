@@ -275,9 +275,8 @@ class CleanNoisyPairDataset(Dataset):
             clean_audio = clean_audio[start:(start + crop_length)]
             noisy_audio = noisy_audio[start:(start + crop_length)]
 
-        #prepare audio signal and spectrogram data pairs
-        clean_audio, noisy_audio = clean_audio.unsqueeze(0), noisy_audio.unsqueeze(0)        
-        clean_features, noisy_features = self.perprocess(clean_audio), self.perprocess(noisy_audio)
+        #prepare audio signal and spectrogram data pairs      
+        clean_features, noisy_features = self.perprocess(clean_audio.unsqueeze(0)), self.perprocess(noisy_audio.unsqueeze(0))
         
         #make input shape suitable for network
         return (clean_features, noisy_features, fileid)
