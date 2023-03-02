@@ -245,7 +245,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
     
     #reverse function of demodulate
-    modulate_denoised = dp.mod_phase(denoised_mag, 
+    modulate_denoised = mod_phase(denoised_mag, 
                             denoised_real, 
                             denoised_imag)
     
