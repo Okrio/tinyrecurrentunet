@@ -363,11 +363,13 @@ class CleanNoisyPairDataset(Dataset):
         to_pcen = pcenfunc(mel.permute((0,2,1)))
         return to_pcen.permute((0, 2, 1))
    
-    def perm(self, tensor):
+    d
+    ef perm(self, tensor):
         '''
         permute function
         '''
         return tensor.permute(2, 0, 1)
+    
     
     def normalise(self, audio):
         audio = audio.squeeze(0)
@@ -376,6 +378,7 @@ class CleanNoisyPairDataset(Dataset):
         norm_audio = (audio - mean) / std
         return norm_audio.unsqueeze(0)
 
+    
     def perprocess(self, audio):
 
         #normalise audio
@@ -398,7 +401,7 @@ class CleanNoisyPairDataset(Dataset):
                           self.perm(imag_demod)), dim = 1)
         
         
-        data = torch.nn.functional.normalize(data, dim=0)
+        #data = torch.nn.functional.normalize(data, dim=0)
         #returns data of structure (time_frame, 4 features, freq_bins)
         return data
         
