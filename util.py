@@ -182,6 +182,37 @@ def sampling(net, noisy_features):
     return net(noisy_features)
 
 
+def mod_phase(magnitude, real_demod, imag_demod):
+    """
+    Reverse operation of demodulation
+    Args:
+      real_demod(float32): real part of the demodulated signal
+      imag_demod(float32): imaginary part of the demodulated signal
+    Returns:
+      Spectrogram(comeplx64)
+
+    """
+    #wrap phase back its original state 
+    wrap = torch.arctan2(real_demod, imag_demod)
+
+    #construct complex spectrogram
+    complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
+    return complex_spectrogram.unsqueeze(0)
+
+
+
+def istft(spectrogram):
+        """
+        Compute inverse short-time fourier transform
+        """
+        return torch.istft(spectrogram,
+                             n_fft=512,
+                             hop_length=128)
+    
+
+
+
+
 def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     
     """
@@ -221,12 +252,12 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
                             denoised_imag)
     
     clean_feat = clean_feat.squeeze(0)
-    modulate_clean = dp.mod_phase(clean_feat.permute(1, 0, 2)[0],
-                                  clean_feat.permute(1, 0, 2)[2],
-                                  clean_feat.permute(1, 0, 2)[3])
+    modulate_clean = mod_phase(clean_feat.permute(1, 0, 2)[0],
+                               clean_feat.permute(1, 0, 2)[2],
+                               clean_feat.permute(1, 0, 2)[3])
     #Spectrogram to Waveform
-    denoised_audio = dp.istft(modulate_denoised.permute(0, 2, 1))
-    clean_audio = dp.istft(modulate_clean.permute(0, 2, 1))
+    denoised_audio = istft(modulate_denoised.permute(0, 2, 1))
+    clean_audio = istft(modulate_clean.permute(0, 2, 1))
     
     # Cosine Similarity Loss
     cs_loss = cs(denoised_audio, clean_audio)
