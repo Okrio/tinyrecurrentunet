@@ -20,7 +20,7 @@
 
         "optimization":{
             "n_iters" : 250000,
-            "learning_rate" : 2e-4,
+            "learning_rate" : 0.0004,
             "batch_size_per_gpu" : 1
         },
         "loss_config":{
