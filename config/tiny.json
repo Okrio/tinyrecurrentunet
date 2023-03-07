@@ -41,7 +41,7 @@
     "trainset" : {
         "root": "/content/content/MyDrive/Insone/DSNDataset/",
         "crop_length_sec": 2,
-        "sample_rate":48000
+        "sample_rate":16000
     },
     
     "gen" : {
