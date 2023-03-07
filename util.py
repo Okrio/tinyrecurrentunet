@@ -10,10 +10,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
 
+from dataset import DataProcessing
 from stft_loss import MultiResolutionSTFTLoss
 from cos_loss import CosSimLoss
 
-#instantiate Cosine Similarity Loss classes
+
+#instantiate DataProcessing and Cosine Similarity Loss classes
+dp = DataProcessing()
 cs = CosSimLoss()
 
 
@@ -232,31 +235,37 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     assert type(X) == tuple and len(X) == 2
     
     #Get noisy/clean specs and audio pairs
-    clean_feat, noisy_feat = X
+    clean_audio, noisy_audio = X
 
     #B, C, L = clean_audio.shape
     output_dic = {}
     loss = 0.0
     
-    #forward prop
+    #from time-domain to 4-feature data
+    clean_feat = dp(clean_audio)
+    noisy_feat = dp(noisy_audio)
+    
+    #forward propagation
     denoised_feat = net(noisy_feat.squeeze(0))  
     
     #convert features back to time-domain
-    denoised_mag, _, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
+    denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
+    _, clean_pcen, _, _ = clean_feat.permute(1, 0, 2)
     
-    #reverse function of demodulate
+    #reverse function of demodulate - to convert back to audio
     modulate_denoised = mod_phase(denoised_mag, 
                             denoised_real, 
                             denoised_imag)
-    clean_feat = clean_feat.squeeze(0)
-    modulate_clean = mod_phase(clean_feat.permute(1, 0, 2)[0],
-                               clean_feat.permute(1, 0, 2)[2],
-                               clean_feat.permute(1, 0, 2)[3])
+    
+    
+    #modulate_clean = mod_phase(clean_feat.permute(1, 0, 2)[0],
+    #                           clean_feat.permute(1, 0, 2)[2],
+    #                           clean_feat.permute(1, 0, 2)[3])
+    
     #Spectrogram to Waveform
     denoised_audio = istft(modulate_denoised.permute(0, 2, 1))
-    clean_audio = istft(modulate_clean.permute(0, 2, 1))
     
-    # Cosine Similarity Loss
+    # calculate Cosine Similarity Loss
     cs_loss = cs(denoised_audio, clean_audio)
 
     loss += cs_loss.cuda() #* ell_p_lambda
@@ -268,5 +277,4 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
         loss += (sc_loss + mag_loss) * stft_lambda
         output_dic["stft_sc"] = sc_loss.data * stft_lambda
         output_dic["stft_mag"] = mag_loss.data * stft_lambda
-
     return loss, output_dic
