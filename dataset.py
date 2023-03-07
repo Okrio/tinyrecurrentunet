@@ -49,7 +49,7 @@ def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
 
 
 
-class DataProcessing:
+class DataProcessing(torch.nn.Module):
 
     '''
     Data preprocessing class converts time-domain audio
@@ -176,7 +176,7 @@ class DataProcessing:
         return norm_audio.unsqueeze(0)
    
     
-    def __call__(self, audio):
+    def forward(self, audio):
 
         #normalise audio
         #audio = self.normalise(audio)
