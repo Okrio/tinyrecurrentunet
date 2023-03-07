@@ -20,10 +20,10 @@ def load_model(model_path, network_config):
 
 
 def export_onnx(model,
+                export_path,
                 time_step, 
                 channels, 
-                frequency,
-                export_path):
+                frequency):
     #Create dummy input for tracing
     x = torch.randn((time_step, channels, frequency), requires_grad = False)
     torch.onnx.export(model,
