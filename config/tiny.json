@@ -57,6 +57,6 @@
     "onnx_config": {
         "time_step" : 351, 
         "channels": 4, 
-        "frequency": 257,
+        "frequency": 257
     }
 }
