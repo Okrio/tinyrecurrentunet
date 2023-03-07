@@ -61,5 +61,8 @@ The model recieves data with shape of (Time-step, 4, Frequency) where dimension 
 ## Evaluation
 
 
-## 
-
+## Export as onnx
+Run the script below to export the trained model in onnx format:
+```
+python onnx.py -c 'PATH_TO_JSON_CONGIF' -i 'PATH_TO_TRAINED_MODEL_CKPT' -o 'ONNX_EXPORT_PATH'
+```
