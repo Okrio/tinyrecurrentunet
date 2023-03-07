@@ -100,7 +100,7 @@ def train(num_gpus,
     n_iter = ckpt_iter + 1
 
     # define learning rate scheduler and stft-loss
-    """
+    
     scheduler = LinearWarmupCosineDecay(
                     optimizer,
                     lr_max=optimization["learning_rate"],
@@ -110,7 +110,7 @@ def train(num_gpus,
                     warmup_proportion=0.05,
                     phase=('linear', 'cosine'),
                 )
-    """
+    
           
 
     if loss_config["stft_lambda"] > 0:
@@ -139,7 +139,7 @@ def train(num_gpus,
             # back-propagation
             loss.backward()
             grad_norm = nn.utils.clip_grad_norm_(net.parameters(), 1e9)
-            #scheduler.step()
+            scheduler.step()
             optimizer.step()
 
             # output to log
