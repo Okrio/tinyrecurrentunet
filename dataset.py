@@ -403,7 +403,7 @@ class CleanNoisyPairDataset(Dataset):
         return data
         
 
-        def load_CleanNoisyPairDataset(root,
+def load_CleanNoisyPairDataset(root,
                                subset,
                                crop_length_sec,
                                batch_size,
