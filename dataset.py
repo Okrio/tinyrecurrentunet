@@ -70,11 +70,16 @@ class DataProcessing(torch.nn.Module):
     
     
     '''
-    def __init__(self):
-        self.n_fft = 512
+    def __init__(self, n_fft = 512,
+                       hop_length = 128,
+                       sample_rate = 16000):
+        
+        super().__init__()
+        self.n_fft = n_fft
         self.n_mels = self.n_fft // 2 + 1
-        self.hop_length = 128
-        self.sample_rate = 16000
+        self.hop_length = hop_length
+        self.sample_rate = sample_rate
+        
         self.mel = torchaudio.transforms.MelSpectrogram(sample_rate=self.sample_rate, 
                                                         n_mels = self.n_mels, 
                                                         n_fft = self.n_fft, 
@@ -115,11 +120,11 @@ class DataProcessing(torch.nn.Module):
         '''
 
         phase = torch.angle(spectrogram)
-        phase = phase.squeeze(0).detach().numpy() #to numpy 
+        phase = phase.squeeze(0).cpu().numpy() #to numpy 
         
         #calculate demodulated phase
         demodulated_phase = np.unwrap(phase)
-        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0)
+        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0).to('cuda')
         
         #get real and imagniary parts of the demodulated phase
         real_demod = torch.sin(demodulated_phase)
@@ -180,17 +185,15 @@ class DataProcessing(torch.nn.Module):
 
         #normalise audio
         #audio = self.normalise(audio)
-        
         #get spectrogram from audio
         spectrogram = self._stft(audio)
-
         #calculate log-magnitude, real and imaginary part of demodulcated phase
         log_magnitude = self.log_mag(spectrogram)
         real_demod, imag_demod = self._demod_phase(spectrogram)
 
         #calculate PCEN
         pcen = self._pcen(audio)
-        
+ 
         #concatenate and permute data to be fed to the network 
         data = torch.cat((self.perm(log_magnitude),
                           self.perm(pcen),
@@ -448,4 +451,4 @@ if __name__ == '__main__':
         noisy_audio = noisy_audio.cuda()
         
         print(clean_audio.shape, noisy_audio.shape, fileid)
-        break  
+        break 
