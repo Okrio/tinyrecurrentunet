@@ -175,6 +175,7 @@ class DataProcessing:
         norm_audio = (audio - mean) / std
         return norm_audio.unsqueeze(0)
    
+    
     def __call__(self, audio):
 
         #normalise audio
@@ -265,7 +266,8 @@ class CleanNoisyPairDataset(Dataset):
         noisy_audio, sample_rate = torchaudio.load(fileid[1])
         clean_audio, noisy_audio = clean_audio.squeeze(0), noisy_audio.squeeze(0)
         assert len(clean_audio) == len(noisy_audio)
-
+        
+        #random crop audio
         crop_length = int(self.crop_length_sec * sample_rate)
         assert crop_length < len(clean_audio)
             
@@ -274,12 +276,8 @@ class CleanNoisyPairDataset(Dataset):
             start = np.random.randint(low=0, high=len(clean_audio) - crop_length + 1)
             clean_audio = clean_audio[start:(start + crop_length)]
             noisy_audio = noisy_audio[start:(start + crop_length)]
-
-        #prepare audio signal and spectrogram data pairs      
-        clean_features, noisy_features = self.perprocess(clean_audio.unsqueeze(0)), self.perprocess(noisy_audio.unsqueeze(0))
-        
-        #make input shape suitable for network
-        return (clean_features, noisy_features, fileid)
+            
+        return (clean_audio.unsqueeze(0), noisy_audio.unsqueeze(0), fileid)
 
 
     def __len__(self):
@@ -404,7 +402,8 @@ class CleanNoisyPairDataset(Dataset):
         #returns data of structure (time_frame, 4 features, freq_bins)
         return data
         
-def load_CleanNoisyPairDataset(root,
+
+        def load_CleanNoisyPairDataset(root,
                                subset,
                                crop_length_sec,
                                batch_size,
@@ -443,14 +442,10 @@ if __name__ == '__main__':
                                             num_gpus=1)
     print(len(trainloader), len(testloader))
 
-    for clean_feat, noisy_feat, clean_audio, noisy_audio, fileid in trainloader:
-        
-        clean_feat = clean_feat.cuda()
-        noisy_feat = noisy_feat.cuda()
+    for clean_audio, noisy_audio, fileid in trainloader:
         
         clean_audio = clean_audio.cuda()
         noisy_audio = noisy_audio.cuda()
         
-        print(clean_feat.shape, noisy_audio.shape, fileid)
         print(clean_audio.shape, noisy_audio.shape, fileid)
         break  
