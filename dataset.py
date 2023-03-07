@@ -394,16 +394,19 @@ class CleanNoisyPairDataset(Dataset):
         pcen = self._pcen(audio)
         
         #concatenate and permute data to be fed to the network 
-        data = torch.cat((self.perm(log_magnitude),
-                          self.perm(pcen),
-                          self.perm(real_demod),
-                          self.perm(imag_demod)), dim = 1)
+        #data = torch.cat((log_magnitude.permute(2, 0, 1),
+        #                  pcen.permute(2, 0, 1),
+        #                  real_demod.permute(2, 0, 1),
+        #                  imag_demod.permute(2, 0, 1)), dim = 1)
         
         
-        data = torch.nn.functional.normalize(data, dim=0)
+        #data = torch.nn.functional.normalize(data, dim=0)
         
         #returns data of structure (time_frame, 4 features, freq_bins)
-        return data
+        return torch.cat((log_magnitude.permute(2, 0, 1),
+                          pcen.permute(2, 0, 1),
+                          real_demod.permute(2, 0, 1),
+                          imag_demod.permute(2, 0, 1)), dim = 1)
         
 
 def load_CleanNoisyPairDataset(root,
