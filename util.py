@@ -241,12 +241,12 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     output_dic = {}
     loss = 0.0
     
-    #from time-domain to 4-feature data
-    clean_feat = dp(clean_audio)
-    noisy_feat = dp(noisy_audio)
+    #from time-domain to 4-features (log-Mag Spec, PCEN, demod Real, demod Imag)
+    clean_feat = dp(clean_audio.squeeze(0))
+    noisy_feat = dp(noisy_audio.squeeze(0))
     
     #forward propagation
-    denoised_feat = net(noisy_feat.squeeze(0))  
+    denoised_feat = net(noisy_feat)  
     
     #convert features back to time-domain
     denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
@@ -266,7 +266,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     denoised_audio = istft(modulate_denoised.permute(0, 2, 1))
     
     # calculate Cosine Similarity Loss
-    cs_loss = cs(denoised_audio, clean_audio)
+    cs_loss = cs(denoised_audio, clean_audio.squeeze(0))
 
     loss += cs_loss.cuda() #* ell_p_lambda
     output_dic["cos_sim_loss"] = cs_loss.data * ell_p_lambda
