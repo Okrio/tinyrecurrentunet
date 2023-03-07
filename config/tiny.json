@@ -51,5 +51,12 @@
     "dist": {
         "dist_backend" : "nccl",
         "dist_url": "tcp://localhost:54321"
+    },
+    
+    
+    "onnx_config": {
+        "time_step" : 351, 
+        "channels": 4, 
+        "frequency": 257,
     }
 }
