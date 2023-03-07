@@ -14,7 +14,7 @@
         "log":{
             "directory" : "./ckpt",
             "ckpt_iter" : "max",
-            "iters_per_ckpt" : 10000,
+            "iters_per_ckpt" : 500,
             "iters_per_valid" : 500
         },
 
