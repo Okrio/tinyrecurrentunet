@@ -110,8 +110,7 @@ def train(num_gpus,
                     warmup_proportion=0.05,
                     phase=('linear', 'cosine'),
                 )
-    
-          
+             
 
     if loss_config["stft_lambda"] > 0:
         mrstftloss = MultiResolutionSTFTLoss(**loss_config["stft_config"]).cuda()
