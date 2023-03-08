@@ -26,7 +26,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('-c', '--config', type=str, help = 'Path to config Json file')
   parser.add_argument('-i', '--ckpt_path', type=str, help = 'Path to trained torch model')
-  
+  args = parser.parse_args()
 
   #load json file
   with open(args.config) as f:
