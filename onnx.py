@@ -53,7 +53,7 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--config',    type=str, help = 'Path to config Json file')
     parser.add_argument('-i', '--ckpt_path', type=str, help = 'Path to trained model checkpoints')
     parser.add_argument('-o', '--exp_path',  type=str, help = 'Onnx model export path')
-    parser.add_argument('-g', '--graph_opt', type=boolean, default = False, help = 'Set to True if onnx graph optimization is required')
+    parser.add_argument('-g', '--graph_opt', type=bool, default = False, help = 'Set to True if onnx graph optimization is required')
     parser.add_argument('-x', '--graph_opt_path', type=str, default = 'content/content/opt_onnx_file.onnx')
     args = parser.parse_args()
     
@@ -77,5 +77,5 @@ if __name__ == "__main__":
     if args.graph_opt == True:
          optim_onnx(args.exp_path,
                     args.graph_opt_path)
-        print('ONNX graph optimized successfully')
+         print('ONNX graph optimized successfully')
         
