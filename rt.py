@@ -40,6 +40,7 @@ def onnx_inference(onnx_model_path):
     
     return (end_time - start_time)
 
+
 def to_numpy(tensor):
   return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()   
   
@@ -63,7 +64,9 @@ if __name__ == "__main__":
   
   #get device
   if torch.cuda.is_available():
-        device = 'GPU' else 'CPU'
+        device = 'GPU' 
+  else: 
+    device = 'CPU'
   
   #load models
   model_config = config["network"]
@@ -78,9 +81,9 @@ if __name__ == "__main__":
     torch_time = torch_inference(torch_model)
     time_keeper_torch.append(torch_time)
    
-  avg_torch_time = time_average(time_keeper_torch)
-  avg_onnx_time = onnx_inference(onnx_model) / time_steps
+  avg_torch_time = round(time_average(time_keeper_torch), 5)
+  avg_onnx_time = round((onnx_inference(onnx_model) / time_steps), 5)
   
-  print("Average inference times on {} in ms:".format(device))
-  print(f"Torch: {avg_torch_time}")
-  print(f"ONNX:  {avg_onnx_time}")
+  print("Average inference times on {} for 2 seconds of audio:".format(device))
+  print(f"Torch: {avg_torch_time} ms / {avg_torch_time * 1000} s")
+  print(f"ONNX:  {avg_onnx_time} ms / {avg_onnx_time * 1000} s")
