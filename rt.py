@@ -21,15 +21,15 @@ def torch_inference(torch_model):
     x = torch.randn((1, 4, 257), dtype = torch.float32, requires_grad = False)
     start_time = time.time()
     with torch.no_grad():
-      y = model(x)
+      y = torch_model(x)
  
     end_time = time.time()
-    return =  end_time - start_time 
+    return  end_time - start_time 
 
 
 #onnx inference function
 def onnx_inference(onnx_model_path):
-    x = torch.randn(1, 4 , 257, dtype = torch.float32)
+    x = torch.randn(751, 4 , 257, dtype = torch.float32)
     ort_session = rt.InferenceSession(onnx_model_path)
     ort_input = {ort_session.get_inputs()[0].name: to_numpy(x)}
     
@@ -39,8 +39,11 @@ def onnx_inference(onnx_model_path):
     end_time = time.time()
     
     return (end_time - start_time)
-    
+
+def to_numpy(tensor):
+  return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()   
   
+
 def time_average(lst):
   return sum(lst) / len(lst)
   
@@ -63,22 +66,17 @@ if __name__ == "__main__":
   torch_model = load_model(args.ckpt_path,
                     model_config)
   onnx_model = args.onnx_path
-  
+  time_steps = 751 
   
   #list to save inference time in each in time
   time_keeper_torch = []
-  time_keeper_onnx = []
-  
-  for i in range(751): 
+  for i in range(time_steps): 
     torch_time = torch_inference(torch_model)
-    onnx_time = onnx_inference(onnx_model)
-    
-    time_keeper.append(torch_time)
-    time_keeper.append(onnx_time)
+    time_keeper_torch.append(torch_time)
    
   avg_torch_time = time_average(time_keeper_torch)
-  avg_onnx_time = time_average(time_keeper_onnx)
+  avg_onnx_time = onnx_inference(onnx_model) / time_steps
   
   print("Average inference times in ms:")
-  print(f"Torch: {avg_inf_time}")
-  print(f"ONNX:  {avg_inf_time}")
+  print(f"Torch: {avg_torch_time}")
+  print(f"ONNX:  {avg_onnx_time}")
