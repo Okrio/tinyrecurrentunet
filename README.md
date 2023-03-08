@@ -62,7 +62,7 @@ The model recieves data with shape of (Time-step, 4, Frequency) where dimension 
 
 
 ## Export as onnx
-Run the script below to export the trained model in onnx format:
+Run this script to export the trained model in onnx format. Specify the paths to the config file, trained model and path to save the onnx export as instructed below.
 ```
 python onnx.py -c 'PATH_TO_JSON_CONFIG' -i 'PATH_TO_TRAINED_MODEL_CKPTs' -o 'ONNX_EXPORT_PATH'
 ```
