@@ -20,12 +20,9 @@ def load_model(model_path, network_config):
 
 
 def export_onnx(model,
-                export_path,
-                time_step, 
-                channels, 
-                frequency):
+                export_path):
     #Create dummy input for tracing
-    x = torch.randn(7511, 4, 257)
+    x = torch.randn(751, 4, 257)
     print(x.shape)
     #export as onnx model
     torch.onnx.export(model,
@@ -33,7 +30,9 @@ def export_onnx(model,
                      export_path,
                      export_params = True,
                      opset_version = 10,
-                     do_constant_folding=True)
+                     do_constant_folding= True,
+                     input_names = ['input'],
+                     output_names = ['output'])
     
 
 
@@ -60,7 +59,6 @@ if __name__ == "__main__":
                                model_config)
     #export onnx model
     export_onnx(trained_model, 
-           args.exp_path, 
-           **onnx_config)
-
-    print('ONNX model exported successfully.')
+           args.exp_path)
+    
+    print('ONNX model exported successfully to {}.'.format(args.exp_path))
