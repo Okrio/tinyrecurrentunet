@@ -61,6 +61,10 @@ if __name__ == "__main__":
     data = f.read()
   config = json.loads(data)
   
+  #get device
+  if torch.cuda.is_available():
+        device = 'GPU' else 'CPU'
+  
   #load models
   model_config = config["network"]
   torch_model = load_model(args.ckpt_path,
@@ -77,6 +81,6 @@ if __name__ == "__main__":
   avg_torch_time = time_average(time_keeper_torch)
   avg_onnx_time = onnx_inference(onnx_model) / time_steps
   
-  print("Average inference times in ms:")
+  print("Average inference times on {} in ms:".format(device))
   print(f"Torch: {avg_torch_time}")
   print(f"ONNX:  {avg_onnx_time}")
