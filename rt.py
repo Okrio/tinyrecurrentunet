@@ -38,6 +38,11 @@ if __name__ == "__main__":
   model = load_model(args.ckpt_path,
                     model_config)
   
+  if torch.cuda.is_available():
+    print('Calculating inference time on GPU')
+  else:
+    print('Calculating inference time on CPU')
+  
   #create dummy input
   x = torch.randn((1, 4, 257),  requires_grad = False)
   
