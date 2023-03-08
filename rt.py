@@ -4,7 +4,7 @@ import json
 import argparse
 import os
 
-from network import TRUNET
+from network import TRUNet
 
 
 # load torch model
@@ -38,28 +38,19 @@ if __name__ == "__main__":
   model = load_model(args.ckpt_path,
                     model_config)
   
-  if torch.cuda.is_available():
-    print('Calculating inference time on GPU')
-  else:
-    print('Calculating inference time on CPU')
-  
   #create dummy input
-  x = torch.randn((1, 4, 257),  requires_grad = False)
   
   time_keeper = []
+  
   for i in range(751):
-    
-    # initiate time
+    x = torch.randn((1, 4, 257),  requires_grad = False)
     start_time = time.time()
-    
-    #forward propagation
     with torch.no_grad():
       y = model(x)
-     
+ 
     end_time = time.time()
-    
     inf_time = (end_time - start_time)
     time_keeper.append(inf_time)
    
-  avg_inf_time = time_average(time_kepper)
+  avg_inf_time = time_average(time_keeper)
   print(f"Average inference time in ms: {avg_inf_time}")
