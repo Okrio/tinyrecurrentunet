@@ -3,7 +3,7 @@ import torch.onnx
 import torch.nn.functional as F
 import onnx
 import json
-import argeparse
+import argparse
 import os
 
 from network import TRUNet
@@ -13,7 +13,7 @@ from network import TRUNet
 def load_model(model_path, network_config):
     model = TRUNet(**network_config)
     ckpt = torch.load(model_path)
-    model.load_state_dict(ckpt[model_state_dict])
+    model.load_state_dict(ckpt['model_state_dict'])
     model.eval()
     return model
 
@@ -25,13 +25,14 @@ def export_onnx(model,
                 channels, 
                 frequency):
     #Create dummy input for tracing
-    x = torch.randn((time_step, channels, frequency), requires_grad = False)
-    
+    x = torch.randn(7511, 4, 257)
+    print(x.shape)
     #export as onnx model
     torch.onnx.export(model,
+                      x,
                      export_path,
                      export_params = True,
-                     opset_version = 15,
+                     opset_version = 10,
                      do_constant_folding=True)
     
 
@@ -39,7 +40,7 @@ def export_onnx(model,
 
 if __name__ == "__main__":
     
-    parser = argeparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config',    type=str, help = 'Path to config Json file')
     parser.add_argument('-i', '--ckpt_path', type=str, help = 'Path to trained model checkpoints')
     parser.add_argument('-o', '--exp_path',  type=str, help = 'Onnx model export path')
@@ -57,8 +58,9 @@ if __name__ == "__main__":
     #load pre-trained model
     trained_model = load_model(args.ckpt_path, 
                                model_config)
-    
     #export onnx model
-    export(trained_model, 
+    export_onnx(trained_model, 
            args.exp_path, 
            **onnx_config)
+
+    print('ONNX model exported successfully.')
