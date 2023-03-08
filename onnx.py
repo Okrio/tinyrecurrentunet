@@ -19,6 +19,14 @@ def load_model(model_path, network_config):
     return model
 
 
+def export_torchscript(model,
+                      export_path):
+    x = torch.randn(751, 4, 257)
+    model.eval()
+    traced = torch.jit.trace(model, x)
+    traced.save(export_path)
+
+    
 
 def export_onnx(model,
                 export_path):
@@ -52,6 +60,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config',    type=str, help = 'Path to config Json file')
     parser.add_argument('-i', '--ckpt_path', type=str, help = 'Path to trained model checkpoints')
+    parser.add_arguement('s', '--torch_script', type=str, help = 'Path to save torchscript file', default = '')
     parser.add_argument('-o', '--exp_path',  type=str, help = 'Onnx model export path')
     parser.add_argument('-g', '--graph_opt', type=bool, default = False, help = 'Set to True if onnx graph optimization is required')
     parser.add_argument('-x', '--graph_opt_path', type=str, default = 'content/content/opt_onnx_file.onnx')
@@ -69,6 +78,7 @@ if __name__ == "__main__":
     #load pre-trained model
     trained_model = load_model(args.ckpt_path, 
                                model_config)
+    
     #export onnx model
     export_onnx(trained_model, 
            args.exp_path)
