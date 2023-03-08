@@ -2,6 +2,7 @@ import torch
 import torch.onnx
 import torch.nn.functional as F
 import onnx
+import onnxruntime as rt
 import json
 import argparse
 import os
@@ -34,7 +35,16 @@ def export_onnx(model,
                      input_names = ['input'],
                      output_names = ['output'])
     
-
+def optim_onnx(onnx_model_path,
+              onnx_opt_path):
+    sess_options = rt.SessionOptions()
+    
+    #set graph optimization level
+    sess_options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_ENABLE_ALL
+    
+    #enable model serialization after graph optimization
+    sess_options.optimized_model_filepath = onnx_opt_path
+    session = rt.InferenceSession(onnx_model_path,  sess_options)
 
 
 if __name__ == "__main__":
@@ -43,6 +53,8 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--config',    type=str, help = 'Path to config Json file')
     parser.add_argument('-i', '--ckpt_path', type=str, help = 'Path to trained model checkpoints')
     parser.add_argument('-o', '--exp_path',  type=str, help = 'Onnx model export path')
+    parser.add_argument('-g', '--graph_opt', type=boolean, default = False, help = 'Set to True if onnx graph optimization is required')
+    parser.add_argument('-x', '--graph_opt_path', type=str, default = 'content/content/opt_onnx_file.onnx')
     args = parser.parse_args()
     
     #load jsoin file
@@ -60,5 +72,10 @@ if __name__ == "__main__":
     #export onnx model
     export_onnx(trained_model, 
            args.exp_path)
-    
     print('ONNX model exported successfully to {}.'.format(args.exp_path))
+    
+    if args.graph_opt == True:
+         optim_onnx(args.exp_path,
+                    args.graph_opt_path)
+        print('ONNX graph optimized successfully')
+        
