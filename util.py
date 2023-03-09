@@ -248,11 +248,11 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     #noisy_feat = dp(noisy_audio)
     
     #forward propagation
-    denoised_feat = net(noisy_audio)  
+    denoised_audio = net(noisy_audio)  
     
     #convert features back to time-domain
-    denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
-    _, clean_pcen, _, _ = clean_feat.permute(1, 0, 2)
+    denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_audio.permute(1, 0, 2)
+    _, clean_pcen, _, _ = clean_audio.permute(1, 0, 2)
     
     #reverse function of demodulate - to convert back to audio
     modulate_denoised = mod_phase(denoised_mag, 
@@ -260,12 +260,13 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
                             denoised_imag)
     
     
-    modulate_clean = mod_phase(clean_feat.permute(1, 0, 2)[0],
-                               clean_feat.permute(1, 0, 2)[2],
-                               clean_feat.permute(1, 0, 2)[3])
+    modulate_clean = mod_phase(clean_audio.permute(1, 0, 2)[0],
+                               clean_audio.permute(1, 0, 2)[2],
+                               clean_audio.permute(1, 0, 2)[3])
     
     #Spectrogram to Waveform
     denoised_audio = istft(modulate_denoised.permute(0, 2, 1))
+    clean_audio = istft(modulate_clean.permute(0, 2, 1))
     
     # calculate Cosine Similarity Loss
     cs_loss = cs(denoised_audio, clean_audio)
