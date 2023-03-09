@@ -244,11 +244,11 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     loss = 0.0
     
     #from time-domain to 4-features (log-Mag Spec, PCEN, demod Real, demod Imag)
-    clean_feat = dp(clean_audio)
-    noisy_feat = dp(noisy_audio)
+    #clean_feat = dp(clean_audio)
+    #noisy_feat = dp(noisy_audio)
     
     #forward propagation
-    denoised_feat = net(noisy_feat)  
+    denoised_feat = net(noisy_audio)  
     
     #convert features back to time-domain
     denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
@@ -260,9 +260,9 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
                             denoised_imag)
     
     
-    #modulate_clean = mod_phase(clean_feat.permute(1, 0, 2)[0],
-    #                           clean_feat.permute(1, 0, 2)[2],
-    #                           clean_feat.permute(1, 0, 2)[3])
+    modulate_clean = mod_phase(clean_feat.permute(1, 0, 2)[0],
+                               clean_feat.permute(1, 0, 2)[2],
+                               clean_feat.permute(1, 0, 2)[3])
     
     #Spectrogram to Waveform
     denoised_audio = istft(modulate_denoised.permute(0, 2, 1))
