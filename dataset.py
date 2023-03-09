@@ -275,6 +275,7 @@ class CleanNoisyPairDataset(Dataset):
             
             clean_audio = self.dp(clean_audio.unsqueeze(0))
             noisy_audio = self.dp(noisy_audio.unsqueeze(0))
+            
         return (clean_audio, noisy_audio, fileid)
 
 
@@ -311,7 +312,7 @@ if __name__ == '__main__':
     with open('/content/tinyrecurrentunet/config/tiny.json') as f:
         data = f.read()
     config = json.loads(data)
-    trainset_config = config('train')
+    trainset_config = config['trainset']
 
     trainloader = load_CleanNoisyPairDataset(**trainset_config,
                                              subset='training',
