@@ -134,8 +134,7 @@ class DataProcessing(torch.nn.Module):
 
 
     def log_mag(self, spectrogram):
-        x = torch.log(torch.abs(spectrogram) +1e-9)
-        return x
+        return torch.log(torch.abs(spectrogram) +1e-9)
     
     
     def istft(self, spectrogram):
