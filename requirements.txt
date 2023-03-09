@@ -21,3 +21,4 @@ scipy
 pesq
 pystoi
 tqdm
+sounddevice
