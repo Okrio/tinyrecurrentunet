@@ -124,7 +124,7 @@ class DataProcessing(torch.nn.Module):
         
         #calculate demodulated phase
         demodulated_phase = np.unwrap(phase)
-        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0).to('cuda')
+        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0)
         
         #get real and imagniary parts of the demodulated phase
         real_demod = torch.sin(demodulated_phase)
@@ -274,8 +274,8 @@ class CleanNoisyPairDataset(Dataset):
             clean_audio = clean_audio[start:(start + crop_length)]
             noisy_audio = noisy_audio[start:(start + crop_length)]
             
-            clean_audio = self.dp(clean_audio)
-            noisy_audio = self.dp(noisy_audio)
+            clean_audio = self.dp(clean_audio.unsqueeze(0))
+            noisy_audio = self.dp(noisy_audio.unsqueeze(0))
         return (clean_audio, noisy_audio, fileid)
 
 
