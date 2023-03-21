@@ -18,8 +18,6 @@ random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
 
-from torchvision import datasets, models, transforms
-import torchaudio
 
 
 
@@ -45,7 +43,6 @@ def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
     else:
         pcen_ = x.div_(M.add_(eps).pow_(alpha)).add_(delta).pow_(r).sub_(delta ** r)
     return pcen_  
-
 
 
 
@@ -89,6 +86,7 @@ class DataProcessing(torch.nn.Module):
         #self.pcen = pcen  
     
     
+    
     def mod_phase(self, magnitude, real_demod, imag_demod):
         """
         Reverse operation of demodulation
@@ -120,7 +118,7 @@ class DataProcessing(torch.nn.Module):
         '''
 
         phase = torch.angle(spectrogram)
-        phase = phase.squeeze(0).cpu().numpy() #to numpy 
+        phase = phase.squeeze(0).cpu().numpy()
         
         #calculate demodulated phase
         demodulated_phase = np.unwrap(phase)
@@ -136,7 +134,8 @@ class DataProcessing(torch.nn.Module):
     def log_mag(self, spectrogram):
         return torch.log(torch.abs(spectrogram) +1e-9)
     
-    
+ 
+
     def istft(self, spectrogram):
         """
         Compute inverse short-time fourier transform
@@ -145,6 +144,7 @@ class DataProcessing(torch.nn.Module):
                              n_fft=self.n_fft,
                              hop_length=self.hop_length)
     
+
     def _stft(self, signal):
 
         '''
@@ -183,9 +183,11 @@ class DataProcessing(torch.nn.Module):
     def forward(self, audio):
 
         #normalise audio
-        #audio = self.normalise(audio)
+        audio = self.normalise(audio)
+        
         #get spectrogram from audio
         spectrogram = self._stft(audio)
+        
         #calculate log-magnitude, real and imaginary part of demodulcated phase
         log_magnitude = self.log_mag(spectrogram)
         real_demod, imag_demod = self._demod_phase(spectrogram)
@@ -193,9 +195,11 @@ class DataProcessing(torch.nn.Module):
         #calculate PCEN
         pcen = self._pcen(audio)        
         
-        #data = torch.nn.functional.normalize(data, dim=0)
         #returns data of structure (time_frame, 4 features, freq_bins)
-        return torch.cat((self.perm(log_magnitude), self.perm(pcen), self.perm(real_demod), self.perm(imag_demod)), dim = 1)
+        return torch.cat((self.perm(log_magnitude), 
+                          self.perm(pcen), 
+                          self.perm(real_demod), 
+                          self.perm(imag_demod)), dim = 1)
 
 
 
@@ -208,20 +212,11 @@ class CleanNoisyPairDataset(Dataset):
        (Clean Spectrogram, Noisy Spectrogram, Clean Audio, Noisy Audio, Filed id)
     """
     
-    def __init__(self, root='./', subset='training', crop_length_sec=0):
-        super(CleanNoisyPairDataset).__init__()
+    def __init__(self, root='./', 
+                 subset='training', 
+                 crop_length_sec=0):
         
-        self.dp = DataProcessing()
-        self.n_fft = 512
-        self.n_mels = self.n_fft // 2 + 1
-        self.hop_length = 128
-        self.sample_rate = 16000
-        self.mel = torchaudio.transforms.MelSpectrogram(sample_rate=self.sample_rate, 
-                                                        n_mels = self.n_mels, 
-                                                        n_fft = self.n_fft, 
-                                                        hop_length = self.hop_length)
-        self.atob = torchaudio.transforms.AmplitudeToDB(stype="amplitude", top_db=80)        
-        
+        super(CleanNoisyPairDataset).__init__()        
         assert subset is None or subset in ["training", "testing"]
         self.crop_length_sec = crop_length_sec
         self.subset = subset
@@ -273,8 +268,8 @@ class CleanNoisyPairDataset(Dataset):
             clean_audio = clean_audio[start:(start + crop_length)]
             noisy_audio = noisy_audio[start:(start + crop_length)]
             
-            clean_audio = self.dp(clean_audio.unsqueeze(0))
-            noisy_audio = self.dp(noisy_audio.unsqueeze(0))
+            clean_audio = clean_audio.unsqueeze(0)
+            noisy_audio = noisy_audio.unsqueeze(0)
             
         return (clean_audio, noisy_audio, fileid)
 
