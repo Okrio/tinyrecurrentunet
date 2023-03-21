@@ -27,7 +27,8 @@ class CosSimLoss(nn.Module):
         super(CosSimLoss, self).__init__()
         self.eps = eps
         self.g = g
-
+        self.m = len(self.g)
+    
     def cos_sim_func(self, input, target):
         '''
         Computes cosine similarity of input and target
