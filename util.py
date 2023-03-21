@@ -14,7 +14,6 @@ from dataset import DataProcessing
 from stft_loss import MultiResolutionSTFTLoss
 from cos_loss import CosSimLoss
 
-
 #instantiate DataProcessing and Cosine Similarity Loss classes
 dp = DataProcessing()
 dp.to(device=torch.device("cuda"), dtype=torch.float32)
@@ -233,35 +232,29 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
         
     """
 
-    assert type(X) == tuple and len(X) == 2
+    #assert type(X) == tuple and len(X) == 
     
     #Get noisy/clean specs and audio pairs
     clean_audio, noisy_audio = X
     clean_audio, noisy_audio = clean_audio.squeeze(0), noisy_audio.squeeze(0)
-    
+
     #B, C, L = clean_audio.shape
     output_dic = {}
     loss = 0.0
     
     #from time-domain to 4-features (log-Mag Spec, PCEN, demod Real, demod Imag)
     noisy_feat = dp(noisy_audio)
-    
     #forward propagation
     denoised_feat = net(noisy_feat)  
     
     #convert features back to time-domain
     denoised_mag, denoised_pcen, denoised_real, denoised_imag = denoised_feat.permute(1, 0, 2)
-    _, clean_pcen, _, _ = clean_audio.permute(1, 0, 2)
     
     #reverse function of demodulate - to convert back to audio
     modulate_denoised = mod_phase(denoised_mag, 
                             denoised_real, 
                             denoised_imag)
     
-    
-    #modulate_clean = mod_phase(clean_audio.permute(1, 0, 2)[0],
-    #                           clean_audio.permute(1, 0, 2)[2],
-    #                           clean_audio.permute(1, 0, 2)[3])
     
     #Spectrogram to Waveform
     denoised_audio = istft(modulate_denoised.permute(0, 2, 1))
