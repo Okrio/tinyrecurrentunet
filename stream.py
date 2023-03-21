@@ -40,11 +40,9 @@ parser.add_argument('--blocksize', type=int, help='block size')
 parser.add_argument('--latency', type=float, help='latency in seconds')
 parser.add_argument('--model_path', type=str, help='path to model')
 parser.add_argument('--model_cofig', type=str, help='JSON file encompassing model config')
-
 args = parser.parse_args(remaining)
 
-
-#load model for denoiser
+#load model function
 def load_model(model_path, network_config):
     model = TRUNet(**network_config)
     ckpt = torch.load(model_path)
@@ -53,29 +51,46 @@ def load_model(model_path, network_config):
     return model
 
 
+def preprocess():
+    """
+    convert time-domain audio to features of shape(freq, 4, time)
+    """
+    pass
+
+def postprocess():
+    """
+    convert features back to time-domain audio
+    """
+    pass
+
+
+#get model configs from JSON file
+with open(args.model_config) as f:
+    data = f.read()
+config = json.loads()
+model_config = config["network"]
+
+#Instantiate model
+model = load_model(args.model_path, model_config)
+
 #stream audio through model
-def callback(indata, outdata, frames, time, status, model):
+def callback(indata, outdata, frames, time, status):
     if status:
         print(status)
-    model = load_model(args.model_path, model_config)
-    #convert numpy to tensor
-    #convert to a data model understands
-    #feed to the model here
-    #convert back to audio
-    denoise = model(indata)
-    outdata[:] = denoise
-
-
-try:
-    with open(args.model_config) as f:
-        data = f.read()
-    config = json.loads()
     
-    global model_config
-    model_config = config["network"]
-
-    model = load_model(args.model_path, model_config)
+    #convert numpy audio-streams to features
+    features = preprocess(indata)
     
+    #feed-forward audio to model
+    denoise_features = model(features)
+    
+    #reconstruct denoised audio from features
+    denoised_audio = posprocess(denoised_features).numpy()
+    
+    #out to stream
+    outdata[:] = denoise_audio
+
+try:    
     with sd.Stream(device=(args.input_device, 
                            args.output_device),
                            samplerate=args.samplerate, 
@@ -85,9 +100,7 @@ try:
                            channels=args.channels,
                            callback=callback):
         
-        print('#' * 80)
         print('press Return to quit')
-        print('#' * 80)
         input()
 except KeyboardInterrupt:
     parser.exit('')
