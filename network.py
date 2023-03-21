@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torch
 from torch.nn import *
 
-
+#TRUNet with 1 dimensional convolutions
 
 class StandardConv1d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride):
@@ -166,7 +166,8 @@ class TRUNet(nn.Module):
 
     
 
-
+    
+#TRUNet with 2 dimensional convolutions
 def pointwise(in_channels, out_channels):
     return Sequential(
         Conv2d(in_channels, out_channels, 1, 1),
@@ -192,7 +193,7 @@ class TRUNet2D(Module):
         super().__init__()
         self.encoder = ModuleList([
             Sequential(Conv2d(in_channels, 64, (5, 1), (2, 1), padding=(2, 0)), BatchNorm2d(64), ReLU()),
-            Sequential(pointwise( 64, 128), depthwise(128, 128, 3, 1)),
+            Sequential(pointwise(64, 128),  depthwise(128, 128, 3, 1)),
             Sequential(pointwise(128, 128), depthwise(128, 128, 5, 2)),
             Sequential(pointwise(128, 128), depthwise(128, 128, 3, 1)),
             Sequential(pointwise(128, 128), depthwise(128, 128, 5, 2)),
