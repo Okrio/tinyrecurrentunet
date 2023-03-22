@@ -69,14 +69,15 @@ class DataProcessing(torch.nn.Module):
     '''
     def __init__(self, n_fft = 512,
                        hop_length = 128,
-                       sample_rate = 16000):
+                       sample_rate = 16000,
+                       net_type = '1D'):
         
         super().__init__()
         self.n_fft = n_fft
         self.n_mels = self.n_fft // 2 + 1
         self.hop_length = hop_length
         self.sample_rate = sample_rate
-        
+        self.net_type = net_type
         self.mel = torchaudio.transforms.MelSpectrogram(sample_rate=self.sample_rate, 
                                                         n_mels = self.n_mels, 
                                                         n_fft = self.n_fft, 
@@ -196,11 +197,17 @@ class DataProcessing(torch.nn.Module):
         #pcen = self._pcen(audio)        
         
         #returns data of structure (time_frame, 4 features, freq_bins)
-        return torch.cat((self.perm(log_magnitude),
-                          self.perm(real_demod), 
-                          self.perm(imag_demod)), dim = 1)
+        if self.net_type == "1D"
+            data = torch.cat((self.perm(log_magnitude),
+                              self.perm(real_demod), 
+                              self.perm(imag_demod)), dim = 1)
+        
+        else:
+            data = torch.cat(((log_magnitude),
+                              (real_demod), 
+                              (imag_demod)), dim = 0)
 
-
+        return data
 
 class CleanNoisyPairDataset(Dataset):
     """
