@@ -1,6 +1,6 @@
 {
     "network" : {
-        "input_size" : 4,
+        "input_size" : 3,
         "channels_input" : 64,
         "channels_output": 4,
         "channels_hidden": 128,
