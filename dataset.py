@@ -193,11 +193,10 @@ class DataProcessing(torch.nn.Module):
         real_demod, imag_demod = self._demod_phase(spectrogram)
 
         #calculate PCEN
-        pcen = self._pcen(audio)        
+        #pcen = self._pcen(audio)        
         
         #returns data of structure (time_frame, 4 features, freq_bins)
-        return torch.cat((self.perm(log_magnitude), 
-                          self.perm(pcen), 
+        return torch.cat((self.perm(log_magnitude),
                           self.perm(real_demod), 
                           self.perm(imag_demod)), dim = 1)
 
