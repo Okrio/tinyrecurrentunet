@@ -129,7 +129,7 @@ class TRUNet(nn.Module):
                 strides,
                 tr_channels_input):
         super(TRUNet, self).__init__()
-        self.down1 = StandardConv1d(4,64,5,2)
+        self.down1 = StandardConv1d(3,64,5,2)
         self.down2 = DepthwiseSeparableConv1d(64, 128, 3, 1)
         self.down3 = DepthwiseSeparableConv1d(128, 128, 5, 2)
         self.down4 = DepthwiseSeparableConv1d(128, 128, 3, 1)
@@ -142,7 +142,7 @@ class TRUNet(nn.Module):
         self.up3 = TrCNN(192, 64, 3, 1)
         self.up4 = TrCNN(192, 64, 5, 2)
         self.up5 = TrCNN(192, 64, 3, 1)
-        self.up6 = LastTrCNN(128, 4, 5, 2)
+        self.up6 = LastTrCNN(128, 3, 5, 2)
   
 
     def forward(self, x):
