@@ -70,6 +70,7 @@ class DataProcessing(torch.nn.Module):
     def __init__(self, n_fft = 512,
                        hop_length = 128,
                        sample_rate = 16000,
+                       min_level_db= -100,
                        net_type = '1D'):
         
         super().__init__()
@@ -77,6 +78,7 @@ class DataProcessing(torch.nn.Module):
         self.n_mels = self.n_fft // 2 + 1
         self.hop_length = hop_length
         self.sample_rate = sample_rate
+        self.min_level_db = min_level_db
         self.net_type = net_type
         self.mel = torchaudio.transforms.MelSpectrogram(sample_rate=self.sample_rate, 
                                                         n_mels = self.n_mels, 
@@ -157,7 +159,14 @@ class DataProcessing(torch.nn.Module):
                             return_complex=True)
             
 
+    def normalize(self, spec):
+      return torch.clip((((spec - self.min_level_db) / - self.min_level_db)*2.) -1., -1, 1)
 
+    
+    def denormalize(self, spec):
+        return (((torch.clip(spec, -1, 1)+1.)/2.) * -min_level_db) + min_level_db
+    
+    
     def _pcen(self, signal):
         #construct spectrogram complex --> float32
         mel = self.mel(signal)
@@ -165,7 +174,7 @@ class DataProcessing(torch.nn.Module):
         to_pcen = pcenfunc(mel.permute((0,2,1)))
         return to_pcen.permute((0, 2, 1))
 
-    
+  
     def perm(self, tensor):
         '''
         permute function
@@ -173,24 +182,13 @@ class DataProcessing(torch.nn.Module):
         return tensor.permute(2, 0, 1)
    
     
-    def normalise(self, audio):
-        audio = audio.squeeze(0)
-        mean = torch.mean(audio)
-        std = torch.std(audio)
-        norm_audio = (audio - mean) / std
-        return norm_audio.unsqueeze(0)
-   
-    
     def forward(self, audio):
-
-        #normalise audio
-        audio = self.normalise(audio)
         
         #get spectrogram from audio
         spectrogram = self._stft(audio)
         
         #calculate log-magnitude, real and imaginary part of demodulcated phase
-        log_magnitude = self.log_mag(spectrogram)
+        log_magnitude = self.normalize(self.log_mag(spectrogram))
         real_demod, imag_demod = self._demod_phase(spectrogram)
 
         #calculate PCEN
