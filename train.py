@@ -19,8 +19,7 @@ from stft_loss import MultiResolutionSTFTLoss
 from util import rescale, find_max_epoch, print_size
 from util import LinearWarmupCosineDecay, loss_fn
 
-from network import TRUNet
-
+from network import TRUNet, TRUNet2D
 
 def train(num_gpus, 
           rank, 
@@ -59,9 +58,9 @@ def train(num_gpus,
     print('Data loaded')
     
     # predefine model
+    if net_type = '1D':
     net = TRUNet(**network_config).cuda()
-    print_size(net)
-
+    
     # apply gradient all reduce
     if num_gpus > 1:
         net = apply_gradient_allreduce(net)
