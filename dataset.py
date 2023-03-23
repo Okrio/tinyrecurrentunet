@@ -123,7 +123,7 @@ class DataProcessing(torch.nn.Module):
         
         #calculate demodulated phase
         demodulated_phase = np.unwrap(phase)
-        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0)
+        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0).cuda()
         
         #get real and imagniary parts of the demodulated phase
         real_demod = torch.sin(demodulated_phase)
@@ -197,7 +197,7 @@ class DataProcessing(torch.nn.Module):
         #pcen = self._pcen(audio)        
         
         #returns data of structure (time_frame, 4 features, freq_bins)
-        if self.net_type == "1D"
+        if self.net_type == "1D":
             data = torch.cat((self.perm(log_magnitude),
                               self.perm(real_demod), 
                               self.perm(imag_demod)), dim = 1)
@@ -226,14 +226,14 @@ class CleanNoisyPairDataset(Dataset):
         assert subset is None or subset in ["training", "testing"]
         self.crop_length_sec = crop_length_sec
         self.subset = subset
-
-        N_clean = len(os.listdir(os.path.join(root, 'training_set/clean')))
-        N_noisy = len(os.listdir(os.path.join(root, 'training_set/noisy')))
+        self.resampler = torchaudio.transforms.Resample(48000, 16000)
+        N_clean = len(os.listdir(os.path.join(root, 'clean')))
+        N_noisy = len(os.listdir(os.path.join(root, 'noisy')))
         assert N_clean == N_noisy
 
         if subset == "training":
-            self.files = [(os.path.join(root, 'training_set/clean', 'fileid_{}.wav'.format(i)),
-                           os.path.join(root, 'training_set/noisy', 'fileid_{}.wav'.format(i))) for i in range(N_clean)]
+            self.files = [(os.path.join(root, 'clean', 'fileid_{}.wav'.format(i)),
+                           os.path.join(root, 'noisy', 'fileid_{}.wav'.format(i))) for i in range(N_clean)]
         
         elif subset == "testing":
             sortkey = lambda name: '_'.join(name.split('_')[-2:])  # specific for dns due to test sample names
@@ -261,6 +261,11 @@ class CleanNoisyPairDataset(Dataset):
         fileid = self.files[n]
         clean_audio, sample_rate = torchaudio.load(fileid[0])
         noisy_audio, sample_rate = torchaudio.load(fileid[1])
+        
+        #resample from 48kHz to 16kHz
+        clean_audio = self.resampler(clean_audio)
+        noisy_audio = self.resampler(noisy_audio)
+        
         clean_audio, noisy_audio = clean_audio.squeeze(0), noisy_audio.squeeze(0)
         assert len(clean_audio) == len(noisy_audio)
         
