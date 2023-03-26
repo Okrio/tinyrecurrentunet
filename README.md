@@ -24,13 +24,6 @@ total_snrlevels: 30
 ```
 
 
-```
-Training set directory: 
-./training_dataset/clean/fileid_{0..10000}.wav
-./training_dataset/noisy/fileid_{0..10000}.wav
-./training_dataset/noise/fileid_{0..10000}.wav
-```
-
 Generate training data: 
 ```
 python noisyspeech_synthesizer_singleprocess.py
@@ -39,9 +32,9 @@ python noisyspeech_synthesizer_singleprocess.py
 Now we assume that the structure of the dataset folder is:
 ```
 Training set: 
-.../dns/training_set/clean/fileid_{0..49999}.wav
-.../dns/training_set/noisy/fileid_{0..49999}.wav
-.../dns/training_set/noise/fileid_{0..49999}.wav
+.../dns/dataset/clean/fileid_{0..49999}.wav
+.../dns/dataset/noisy/fileid_{0..49999}.wav
+.../dns/dataset/noise/fileid_{0..49999}.wav
 ```
 
 ## Training
@@ -62,7 +55,7 @@ The model recieves data with shape of (Time-step, 4, Frequency) where dimension 
 
 
 ## Export as onnx
-Run this script to export the trained model in onnx format. Specify the paths to the config file, trained model and path to save the onnx export as instructed below.
+To export model in **onnx** format, run the script below, specifying paths as described:
 ```
 python onnx.py -c 'PATH_TO_JSON_CONFIG' -i 'PATH_TO_TRAINED_MODEL_CKPTs' -o 'ONNX_EXPORT_PATH'
 ```
