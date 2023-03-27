@@ -9,6 +9,7 @@ warnings.filterwarnings("ignore")
 import torch
 import torch.nn as nn
 import torchaudio
+from torchaudio import transforms as T
 from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchaudio import transforms
@@ -17,9 +18,6 @@ import random
 random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
-
-
-
 
 #Calcualate Per-Channel Energy Normalization
 def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
@@ -42,170 +40,115 @@ def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
         pcen_ = (x / (M + eps).pow(alpha) + delta).pow(r) - delta ** r
     else:
         pcen_ = x.div_(M.add_(eps).pow_(alpha)).add_(delta).pow_(r).sub_(delta ** r)
-    return pcen_  
+    return pcen_ 
 
 
 
-class DataProcessing(torch.nn.Module):
+class ProcessAudio(nn.Module):
 
-    '''
-    Data preprocessing class converts time-domain audio
-    signal into structure of shape (timeframe, 4, freq_bins)
-    where 4 dimension represents:
-        (log_spctrogram,
-         pcen transformed spectrogram,
-         real part of demodulated phase,
-         imag part of demodulated phase)
+  def __init__(self,
+               n_fft = 512,
+               hop_length = 128,
+               sample_rate = 16000,
+               min_level_db = -100):
     
-    Input:
-        Tuple: ((1, time-domain signal) clean),
-                (1, time-domain signal) noisy))
+    super().__init__()
+    self.n_fft = n_fft
+    self.n_mels = self.n_fft // 2 + 1
+    self.hop_length = hop_length
+    self.sample_rate = sample_rate
+    self.min_level_db = min_level_db
+    self.sr = 48000
+    self.target_sr = 16000
+    self.spec = T.Spectrogram(n_fft = self.n_fft, 
+                              hop_length = self.hop_length, 
+                              power=None, 
+                              normalized=True)
     
-    Returns:
-        Tuple: ((time-frame, 4, freq_bins) clean,
-                (time-frame, 4, freq_bins) noisy)
-    
-    
-    '''
-    def __init__(self, n_fft = 512,
-                       hop_length = 128,
-                       sample_rate = 16000,
-                       min_level_db= -100,
-                       net_type = '1D'):
-        
-        super().__init__()
-        self.n_fft = n_fft
-        self.n_mels = self.n_fft // 2 + 1
-        self.hop_length = hop_length
-        self.sample_rate = sample_rate
-        self.min_level_db = min_level_db
-        self.net_type = net_type
-        self.mel = torchaudio.transforms.MelSpectrogram(sample_rate=self.sample_rate, 
-                                                        n_mels = self.n_mels, 
-                                                        n_fft = self.n_fft, 
-                                                        hop_length = self.hop_length)
-        
-        self.atob = torchaudio.transforms.AmplitudeToDB(stype="amplitude", top_db=80)
-        #self.pcen = pcen  
-    
-    
-    
-    def mod_phase(self, magnitude, real_demod, imag_demod):
-        """
-        Reverse operation of demodulation
-        Args:
-          real_demod(float32): real part of the demodulated signal
-          imag_demod(float32): imaginary part of the demodulated signal
-        Returns:
-          Spectrogram(comeplx64)
-        
-        """
-        #wrap phase back its original state 
-        wrap = torch.arctan2(real_demod, imag_demod)
+    self.inv_spec = T.InverseSpectrogram(n_fft = self.n_fft, 
+                                      hop_length = self.hop_length, 
+                                      normalized=True)
 
-        #construct complex spectrogram
-        complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
-        return complex_spectrogram.unsqueeze(0)
+  def demod_phase(self, phase):
+      
+      '''
+      Calculates demodulated phase of real and imaginary
+      Args:
+          spectrogram
+      Returns:
+          real_demod (float32):   Demodulated phase of real
+          imag_demod (float32):   Demodulated phase of imaginary
+      '''
+      phase = phase.squeeze(0).numpy()
+      
+      #calculate demodulated phase
+      demodulated_phase = np.unwrap(phase)
+      demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0)
+      
+      #get real and imagniary parts of the demodulated phase
+      real_demod = torch.sin(demodulated_phase)
+      imag_demod = torch.cos(demodulated_phase)
+
+      return real_demod, imag_demod
+  
+  
+  def mod_phase(self, magnitude, real_demod, imag_demod):
+      """
+      Reverse operation of demodulation
+      Args:
+        real_demod(float32): real part of the demodulated signal
+        imag_demod(float32): imaginary part of the demodulated signal
+      Returns:
+        Spectrogram(comeplx64)
+      
+      """
+      #wrap phase back its original state 
+      wrap = torch.arctan2(real_demod, imag_demod)
+
+      #construct complex spectrogram
+      complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
+      return complex_spectrogram.unsqueeze(0)
 
 
-
-    def _demod_phase(self, spectrogram):
-        
-        '''
-        Calculates demodulated phase of real and imaginary
-        Args:
-            spectrogram
-        Returns:
-            real_demod (float32):   Demodulated phase of real
-            imag_demod (float32):   Demodulated phase of imaginary
-        '''
-
-        phase = torch.angle(spectrogram)
-        phase = phase.squeeze(0).cpu().numpy()
-        
-        #calculate demodulated phase
-        demodulated_phase = np.unwrap(phase)
-        demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0).cuda()
-        
-        #get real and imagniary parts of the demodulated phase
-        real_demod = torch.sin(demodulated_phase)
-        imag_demod = torch.cos(demodulated_phase)
-
-        return real_demod, imag_demod
-
-
-    def log_mag(self, spectrogram):
-        return torch.log(torch.abs(spectrogram) +1e-9)
-    
- 
-
-    def istft(self, spectrogram):
-        """
-        Compute inverse short-time fourier transform
-        """
-        return torch.istft(spectrogram,
-                             n_fft=self.n_fft,
-                             hop_length=self.hop_length)
-    
-
-    def _stft(self, signal):
-
-        '''
-        Compute complex form short-time fourier transform
-        '''
-        return torch.stft(signal, 
-                            n_fft=self.n_fft, 
-                            hop_length=self.hop_length,
-                            return_complex=True)
-            
-
-    def normalize(self, spec):
-      return torch.clip((((spec - self.min_level_db) / - self.min_level_db)*2.) -1., -1, 1)
-
-    
-    def denormalize(self, spec):
-        return (((torch.clip(spec, -1, 1)+1.)/2.) * -min_level_db) + min_level_db
-    
-    
-    def _pcen(self, signal):
-        #construct spectrogram complex --> float32
-        mel = self.mel(signal)
-        amp_to_db = self.atob(mel)
-        to_pcen = pcenfunc(mel.permute((0,2,1)))
-        return to_pcen.permute((0, 2, 1))
+  def log_mag(self, magnitude):
+      return torch.log(magnitude + 1e-9)
+  
+  
+  def get_mag_phase(self, spectrogram):
+    magnitude = torch.abs(spectrogram)
+    phase = torch.angle(spectrogram)
+    return magnitude, phase
 
   
-    def perm(self, tensor):
-        '''
-        permute function
-        '''
-        return tensor.permute(2, 0, 1)
-   
+  def istft(self, complex_spec):
+    return self.inv_spec(complex_spec)
+  
+  
+  def perm(self, tensor):
+      return tensor.permute(2, 0, 1)
+
+  def de_perm(self, tensor):
+    return tensor.permute(1, 2, 0)
+  
+  
+  def norm(self, audio):
+    mean = torch.mean(audio)
+    std = torch.std(audio)
+    return (audio - mean / std)
+
+  
+  def forward(self, audio):
     
-    def forward(self, audio):
-        
-        #get spectrogram from audio
-        spectrogram = self._stft(audio)
-        
-        #calculate log-magnitude, real and imaginary part of demodulcated phase
-        log_magnitude = self.normalize(self.log_mag(spectrogram))
-        real_demod, imag_demod = self._demod_phase(spectrogram)
+    audio = self.norm(audio)
+    spectrogram = self.spec(audio)
+    magnitude, phase = self.get_mag_phase(spectrogram)
+    real_demod, imag_demod = self.demod_phase(phase)
+    features = torch.cat((self.perm(self.log_mag(magnitude)),
+                          self.perm(real_demod),
+                          self.perm(imag_demod)), dim=1)  
+    return features
 
-        #calculate PCEN
-        #pcen = self._pcen(audio)        
-        
-        #returns data of structure (time_frame, 4 features, freq_bins)
-        if self.net_type == "1D":
-            data = torch.cat((self.perm(log_magnitude),
-                              self.perm(real_demod), 
-                              self.perm(imag_demod)), dim = 1)
-        
-        else:
-            data = torch.cat(((log_magnitude),
-                              (real_demod), 
-                              (imag_demod)), dim = 0)
 
-        return data
 
 class CleanNoisyPairDataset(Dataset):
     """
@@ -257,8 +200,8 @@ class CleanNoisyPairDataset(Dataset):
 
     def __getitem__(self, n):
         fileid = self.files[n]
-        clean_audio, sample_rate = torchaudio.load(fileid[0])
-        noisy_audio, sample_rate = torchaudio.load(fileid[1])
+        clean_audio, sample_rate = torchaudio.load(fileid[0], normalize=True)
+        noisy_audio, sample_rate = torchaudio.load(fileid[1], normalize=True)
         
         #resample from 48kHz to 16kHz
         clean_audio = self.resampler(clean_audio)
@@ -285,9 +228,7 @@ class CleanNoisyPairDataset(Dataset):
 
     def __len__(self):
         return len(self.files)
-
-    
-    
+      
 
 def load_CleanNoisyPairDataset(root,
                                subset,
