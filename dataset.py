@@ -79,11 +79,11 @@ class ProcessAudio(nn.Module):
           real_demod (float32):   Demodulated phase of real
           imag_demod (float32):   Demodulated phase of imaginary
       '''
-      phase = phase.squeeze(0).numpy()
+      phase = phase.squeeze(0).cpu().numpy()
       
       #calculate demodulated phase
       demodulated_phase = np.unwrap(phase)
-      demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0)
+      demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0).cuda()
       
       #get real and imagniary parts of the demodulated phase
       real_demod = torch.sin(demodulated_phase)
