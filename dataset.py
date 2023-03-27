@@ -43,7 +43,6 @@ def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
     return pcen_ 
 
 
-
 class ProcessAudio(nn.Module):
 
   def __init__(self,
@@ -63,11 +62,11 @@ class ProcessAudio(nn.Module):
     self.spec = T.Spectrogram(n_fft = self.n_fft, 
                               hop_length = self.hop_length, 
                               power=None, 
-                              normalized=True)
+                              normalized=False)
     
     self.inv_spec = T.InverseSpectrogram(n_fft = self.n_fft, 
                                       hop_length = self.hop_length, 
-                                      normalized=True)
+                                      normalized=False)
 
   def demod_phase(self, phase):
       
@@ -132,8 +131,8 @@ class ProcessAudio(nn.Module):
   
   
   def norm(self, audio):
-    mean = torch.mean(audio)
-    std = torch.std(audio)
+    mean = torch.mean(audio, dim=1)
+    std = torch.std(audio, dim=1)
     return (audio - mean / std)
 
   
@@ -161,14 +160,14 @@ class CleanNoisyPairDataset(Dataset):
     
     def __init__(self, root='./', 
                  subset='training', 
-                 crop_length_sec=0,
-                 resample=True):
+                 crop_length_sec=0):
         
         super(CleanNoisyPairDataset).__init__()        
         assert subset is None or subset in ["training", "testing"]
         self.crop_length_sec = crop_length_sec
         self.subset = subset
-        self.resampler = torchaudio.transforms.Resample(48000, 16000)
+        self.resampler = T.Resample(48000, 16000)
+        
         N_clean = len(os.listdir(os.path.join(root, 'clean')))
         N_noisy = len(os.listdir(os.path.join(root, 'noisy')))
         assert N_clean == N_noisy
@@ -200,19 +199,17 @@ class CleanNoisyPairDataset(Dataset):
     
 
     def __getitem__(self, n):
+        
         fileid = self.files[n]
         clean_audio, sample_rate = torchaudio.load(fileid[0], normalize=True)
         noisy_audio, sample_rate = torchaudio.load(fileid[1], normalize=True)
         
         #resample from 48kHz to 16kHz
-        if resample:
-            clean_audio = self.resampler(clean_audio)
-            noisy_audio = self.resampler(noisy_audio)
         
         clean_audio, noisy_audio = clean_audio.squeeze(0), noisy_audio.squeeze(0)
         assert len(clean_audio) == len(noisy_audio)
-        
         #random crop audio
+        
         crop_length = int(self.crop_length_sec * sample_rate)
         assert crop_length < len(clean_audio)
             
@@ -224,7 +221,6 @@ class CleanNoisyPairDataset(Dataset):
             
             clean_audio = clean_audio.unsqueeze(0)
             noisy_audio = noisy_audio.unsqueeze(0)
-            
         return (clean_audio, noisy_audio, fileid)
 
 
