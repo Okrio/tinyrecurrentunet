@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
 
-from dataset import DataProcessing
+from dataset import ProcessAudio
 from stft_loss import MultiResolutionSTFTLoss
 from cos_loss import CosSimLoss
 
@@ -248,7 +248,7 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     denoised_feat = net(noisy_feat)  
     
     #convert features back to time-domain
-    denoised_feat = dp.de_perm(denoised_audio)
+    denoised_feat = dp.de_perm(denoised_feat)
     denoised_mag, denoised_real, denoised_imag = denoised_feat
     
     #reverse function of demodulate - to convert back to audio
