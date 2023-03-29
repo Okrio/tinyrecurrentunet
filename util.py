@@ -232,9 +232,9 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     
     
     #cs_loss = cs(denoised_audio, clean_audio)
-    mse_loss = nn.MSELoss(denoised_audio, clean_audio)
+    l1_loss = nn.L1Loss(denoised_audio, clean_audio)
     loss += mse_loss.cuda()
-    output_dic["mse"] = mse_loss.data
+    output_dic["l1"] = l1_loss.data
     
     #multi resolution short-time fourier transform loss
     if stft_lambda > 0:
