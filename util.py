@@ -156,7 +156,7 @@ class LinearWarmupCosineDecay:
         return lr
 
 
-#model utls
+    
 def std_normal(size):
     """
     Generate the standard Gaussian variable of a certain size
@@ -181,35 +181,6 @@ def sampling(net, noisy_features):
     Forward propegating noisy features
     """
     return net(noisy_features)
-
-
-def mod_phase(magnitude, real_demod, imag_demod):
-    """
-    Reverse operation of demodulation
-    Args:
-      real_demod(float32): real part of the demodulated signal
-      imag_demod(float32): imaginary part of the demodulated signal
-    Returns:
-      Spectrogram(comeplx64)
-
-    """
-    #wrap phase back its original state 
-    wrap = torch.arctan2(real_demod, imag_demod)
-
-    #construct complex spectrogram
-    complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
-    return complex_spectrogram.unsqueeze(0)
-
-
-
-def istft(spectrogram):
-        """
-        Compute inverse short-time fourier transform
-        """
-        return torch.istft(spectrogram,
-                             n_fft=512,
-                             hop_length=128)
-    
 
 
 
@@ -260,13 +231,11 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     denoised_audio = dp.istft(modulate_denoised)
     
     
-    # calculate Cosine Similarity Loss
-    cs_loss = cs(denoised_audio, clean_audio)
-
-    loss += cs_loss.cuda() #* ell_p_lambda
-    output_dic["cos_sim_loss"] = cs_loss.data * ell_p_lambda
+    #cs_loss = cs(denoised_audio, clean_audio)
+    mse_loss = nn.MSELoss(denoised_audio, clean_audio)
+    loss += mse_loss.cuda()
+    output_dic["mse"] = mse_loss.data
     
-
     #multi resolution short-time fourier transform loss
     if stft_lambda > 0:
         sc_loss, mag_loss = mrstftloss(denoised_audio, clean_audio)
