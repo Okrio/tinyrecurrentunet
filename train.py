@@ -58,7 +58,6 @@ def train(num_gpus,
     print('Data loaded')
     
     # predefine model
-    if net_type = '1D':
     net = TRUNet(**network_config).cuda()
     
     # apply gradient all reduce
