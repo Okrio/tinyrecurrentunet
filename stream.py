@@ -11,8 +11,11 @@ import sounddevice as sd
 import numpy  # Make sure NumPy is loaded before it is used in the callback
 import torch
 import torchaudio
+from dataset import ProcessAudio
 assert numpy  # avoid "imported but unused" message (W0611)
 
+
+dp = ProcessAudio()
 
 def int_or_str(text):
     """Helper function for argument parsing."""
@@ -57,6 +60,9 @@ def preprocess():
     """
     pass
 
+
+
+
 def postprocess():
     """
     convert features back to time-domain audio
@@ -78,18 +84,33 @@ def callback(indata, outdata, frames, time, status):
     if status:
         print(status)
     
-    #convert numpy audio-streams to features
-    features = preprocess(indata)
+    #numpy to tensor
+    indata = torch.form_numpy(a)
+    
+    #convert tensor audio-streams to features
+    features = dp(indata)
     
     #feed-forward audio to model
     denoise_features = model(features)
     
     #reconstruct denoised audio from features
-    denoised_audio = posprocess(denoised_features).numpy()
+    denoised_feat = dp.de_perm(denoised_feat)
+    denoised_mag, denoised_real, denoised_imag = denoised_feat
+    modulate_denoised = dp.mod_phase(denoised_mag, 
+                            denoised_real, 
+                            denoised_imag)
+    
+    denoised_audio = dp.istft(modulate_denoised)
+    
+    #tensor to numpy
+    denoised_audio = denoised_audio.numpy()
     
     #out to stream
     outdata[:] = denoise_audio
 
+
+    
+#Start stream 
 try:    
     with sd.Stream(device=(args.input_device, 
                            args.output_device),
