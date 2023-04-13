@@ -49,10 +49,10 @@ The model recieves data with shape of (Time-step, 4, Frequency) where dimension 
 
 
 ## Denoising
-
+TODO
 
 ## Evaluation
-
+TODO
 
 ## Export as onnx
 To export model in **onnx** format, run the script below, specifying paths as described:
