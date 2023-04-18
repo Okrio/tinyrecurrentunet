@@ -13,6 +13,8 @@ from torchaudio import transforms as T
 from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchaudio import transforms
+from util import diff, unwrap
+
 
 import random
 random.seed(0)
@@ -78,10 +80,11 @@ class ProcessAudio(nn.Module):
           real_demod (float32):   Demodulated phase of real
           imag_demod (float32):   Demodulated phase of imaginary
       '''
-      phase = phase.squeeze(0).cpu().numpy()
-      
+      #phase = phase.squeeze(0).cpu().numpy()
+ 
       #calculate demodulated phase
-      demodulated_phase = np.unwrap(phase)
+      #demodulated_phase = np.unwrap(phase)
+      demodulated_phase = unwrap(phase)
       demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0).cuda()
       
       #get real and imagniary parts of the demodulated phase
@@ -131,11 +134,14 @@ class ProcessAudio(nn.Module):
   
   
   def norm(self, audio):
-    mean = torch.mean(audio, dim=1)
-    std = torch.std(audio, dim=1)
-    return (audio - mean / std)
+    #implement peak normalization
+    #from MelGAN
+    pass
 
-  
+  def de_norm(self, spec)
+    pass
+
+
   def forward(self, audio):
     
     audio = self.norm(audio)
