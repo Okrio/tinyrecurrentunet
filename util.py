@@ -82,14 +82,11 @@ def diff(x, axis):
     size[axis] -= 1
     slice_front = x[begin_front[0]:begin_front[0] + size[0], begin_front[1]:begin_front[1] + size[1]]
     slice_back = x[begin_back[0]:begin_back[0]+size[0], begin_back[1]:begin_back[1]+size[1]]
-    print(slice_front)
-    print(slice_back)
     d = slice_front - slice_back
     return d
 
 
 def unwrap(p, axis = -1):
-  
   pi = torch.tensor(torch.acos(torch.zeros(1)).item() * 2)
   dd = diff(p, axis=axis)
   ddmod = torch.remainder(dd + pi, 2.0 * pi) - pi
@@ -99,7 +96,6 @@ def unwrap(p, axis = -1):
   idx = torch.less(torch.abs(dd), pi)
   ddmod = torch.where(idx, torch.zeros_like(ddmod), dd)
   ph_cumsum = torch.cumsum(ph_correct, axis=axis)
-  
   shape = torch.tensor(p.shape)
   shape[axis] = 1
   ph_cumsum = torch.cat([torch.zeros(list(shape)), ph_cumsum], axis=axis)
