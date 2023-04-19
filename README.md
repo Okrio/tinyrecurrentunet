@@ -45,7 +45,7 @@ The ```tiny.json``` file complies with the paper's configurations and hyperparam
 python3 distributed.py -c config/tiny.json
 ```
 
-The model recieves data with shape of (Time-step, 4, Frequency) where dimension one encomapasses a channel-wise concatenation of log-magnitude spectrogram, PCEN spectrogram, and real/imaginary part of demodulated phase respectively. To compensate memory over-load, our code utilises the aforementiond data information to reconstruct time-domain audio in order to calculate Multi-Resolution STFT Loss instead loading audio file pairs on the GPU.
+The model recieves data with shape of (Time-step, 4, Frequency) where dimension 1 encomapasses a channel-wise concatenation of log-magnitude spectrogram, PCEN spectrogram, and real/imaginary part of demodulated phase respectively. To compensate memory over-load, our code utilises the aforementiond data information to reconstruct time-domain audio in order to calculate Multi-Resolution STFT Loss instead loading audio file pairs on the GPU.
 
 
 ## Denoising
