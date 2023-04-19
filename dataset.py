@@ -164,9 +164,13 @@ class ProcessAudio(nn.Module):
 
 
  def backward(self, features):
-    pass
-
-
+    denoised_mag, denoised_real, denoised_imag = self.de_perm(features)
+    modulate_denoised = self.mod_phase(denoised_mag, 
+                                     denoised_real, 
+                                     denoised_imag)
+    denoised_audio = self.istft(self.inv_melscale(self.de_norm(modulate_denoised)))
+    return denoised_audio
+    
 
 class CleanNoisyPairDataset(Dataset):
     """
