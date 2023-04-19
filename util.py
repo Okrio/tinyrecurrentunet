@@ -253,19 +253,10 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     denoised_feat = net(noisy_feat)  
     
     #convert features back to time-domain
-    denoised_feat = dp.de_perm(denoised_feat)
-    denoised_mag, denoised_real, denoised_imag = denoised_feat
+    denoised_audio = dp.backward(denoised_feat)
     
-    #reverse function of demodulate - to convert back to audio
-    modulate_denoised = dp.mod_phase(denoised_mag, 
-                            denoised_real, 
-                            denoised_imag)
-     
-    #Spectrogram to Waveform
-    denoised_audio = dp.istft(modulate_denoised)
-    
-    
-    #cs_loss = cs(denoised_audio, clean_audio)
+   
+    #L1 Loss
     l1_loss = nn.L1Loss(denoised_audio, clean_audio)
     loss += mse_loss.cuda()
     output_dic["l1"] = l1_loss.data
