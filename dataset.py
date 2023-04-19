@@ -61,6 +61,7 @@ class ProcessAudio(nn.Module):
     self.min_level_db = min_level_db
     self.sr = 48000
     self.target_sr = 16000
+    self.min_level_db = -100
     self.spec = T.Spectrogram(n_fft = self.n_fft, 
                               hop_length = self.hop_length, 
                               power=None, 
@@ -69,7 +70,16 @@ class ProcessAudio(nn.Module):
     self.inv_spec = T.InverseSpectrogram(n_fft = self.n_fft, 
                                       hop_length = self.hop_length, 
                                       normalized=False)
-
+    
+    
+    self.melscale = T.MelScale(n_mels = self.n_mels,
+                              sample_rate = self.sample_rate,
+                              n_stft = n_fft)
+    
+    self.inv_melscale = T.InverseMelScale(n_stft = n_fft,
+                                          n_mels = self.n_mels,
+                                         sample_rate = self.sample_rate)
+    
   def demod_phase(self, phase):
       
       '''
@@ -114,44 +124,47 @@ class ProcessAudio(nn.Module):
 
   def log_mag(self, magnitude):
       return torch.log(magnitude + 1e-9)
-  
-  
+   
   def get_mag_phase(self, spectrogram):
     magnitude = torch.abs(spectrogram)
     phase = torch.angle(spectrogram)
     return magnitude, phase
-
   
   def istft(self, complex_spec):
     return self.inv_spec(complex_spec)
   
+  def mel(spec):
+    return self.melscale(spec)
+
+  def inv_mel(mel_spec):
+    return self.inv_melscale(mel_spec) 
   
   def perm(self, tensor):
       return tensor.permute(2, 0, 1)
 
   def de_perm(self, tensor):
-    return tensor.permute(1, 2, 0)
+    return tensor.permute(1, 2, 0) 
   
-  
-  def norm(self, audio):
-    #implement peak normalization
-    #from MelGAN
-    pass
+  def norm(self, spec):
+    return torch.clamp((((spec - self.min_level_db) / -self.min_level_db)*2.)-1., -1, 1)
 
   def de_norm(self, spec)
-    pass
+    return (((torch.clamp(spec, -1, 1)+1.)/2.) * -self.min_level_db) + self.min_level_db
 
 
   def forward(self, audio):
     
-    audio = self.norm(audio)
-    spectrogram = self.spec(audio)
+    spectrogram = self.norm(self.mel(self.spec(audio)))
     magnitude, phase = self.get_mag_phase(spectrogram)
     real_demod, imag_demod = self.demod_phase(phase)
     features = torch.cat((self.perm(self.log_mag(magnitude)),
                           self.perm(real_demod),
                           self.perm(imag_demod)), dim=1)  
     return features
+
+
+ def backward(self, features):
+    pass
 
 
 
