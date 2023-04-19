@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torchaudio
 from torchaudio import transforms as T
+from torchaudio import functional as F
 from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchaudio import transforms
@@ -62,7 +63,11 @@ class ProcessAudio(nn.Module):
     self.sr = 48000
     self.target_sr = 16000
     self.min_level_db = -100
-    self.spec = T.Spectrogram(n_fft = self.n_fft, 
+    
+    self.dbtoa = F.DB_to_amplitude(x: Tensor, ref: float, power: float)
+    self.atodb = F.amplitude_to_DB(x: Tensor, multiplier: float, amin: float, db_multiplier: float, top_db: Optional[float] = None)
+    
+    ]self.spec = T.Spectrogram(n_fft = self.n_fft, 
                               hop_length = self.hop_length, 
                               power=None, 
                               normalized=False)
@@ -154,7 +159,7 @@ class ProcessAudio(nn.Module):
 
   def forward(self, audio):
     
-    spectrogram = self.norm(self.mel(self.spec(audio)))
+    spectrogram = self.norm(self.atodb(self.mel(self.spec(audio))))
     magnitude, phase = self.get_mag_phase(spectrogram)
     real_demod, imag_demod = self.demod_phase(phase)
     features = torch.cat((self.perm(self.log_mag(magnitude)),
@@ -168,7 +173,7 @@ class ProcessAudio(nn.Module):
     modulate_denoised = self.mod_phase(denoised_mag, 
                                      denoised_real, 
                                      denoised_imag)
-    denoised_audio = self.istft(self.inv_melscale(self.de_norm(modulate_denoised)))
+    denoised_audio = self.istft(self.inv_melscale(self.dbtoa(self.de_norm(modulate_denoised))))
     return denoised_audio
     
 
