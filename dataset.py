@@ -46,6 +46,50 @@ def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
     return pcen_ 
 
 
+
+class Augment:   
+    
+    '''
+    Applies data augmentation on the noise signal prior
+    
+    '''
+    
+    def __init__(self):
+
+        #gain in dB
+        self.min_gain = -12.0
+        self.max_gain = -5.0
+
+        #frequency in Hz
+        self.lp_min = 7000
+        self.lp_max = 10000
+
+        self.hp_min = 800
+        self.hp_max = 1200
+
+        #samplin rate
+        self.sr = 48000
+
+        self.gains = torch.arange(self.min_gain, self.max_gain, 0.033)
+        self.lp_freqs = torch.arange(self.lp_min, self.lp_max, 100)
+        self.hp_freqs = torch.arange(self.hp_min, self.hp_max, 50)
+    
+    
+    def __call__(self, x):
+      
+      #get audgmentation parameters
+      lp_cutoff = random.choice(self.lp_freqs)
+      hp_cutoff = random.choice(self.hp_freqs)
+      pitch = random.choice(self.pitches)
+      gain = random.choice(self.gains)
+      
+      #apply augmentation
+      x = F.gain(x, gain_db = gain)
+      x = F.lowpass_biquad(x, self.sr, lp_cutoff, Q = 0.7)
+      x = F.highpass_biquad(x, self.sr, hp_cutoff, Q = 0.7)
+      return x
+
+
 class ProcessAudio(nn.Module):
 
   def __init__(self,
