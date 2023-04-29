@@ -105,13 +105,9 @@ class ProcessAudio(nn.Module):
     self.sample_rate = sample_rate
     self.min_level_db = min_level_db
     self.sr = 48000
-    self.target_sr = 16000
-    self.min_level_db = -100
-    
-    self.dbtoa = F.DB_to_amplitude(x: Tensor, ref: float, power: float)
-    self.atodb = F.amplitude_to_DB(x: Tensor, multiplier: float, amin: float, db_multiplier: float, top_db: Optional[float] = None)
-    
-    ]self.spec = T.Spectrogram(n_fft = self.n_fft, 
+    self.min_level_db = -100.
+    self.ref_level_db = 25.
+    self.spec = T.Spectrogram(n_fft = self.n_fft, 
                               hop_length = self.hop_length, 
                               power=None, 
                               normalized=False)
@@ -119,16 +115,15 @@ class ProcessAudio(nn.Module):
     self.inv_spec = T.InverseSpectrogram(n_fft = self.n_fft, 
                                       hop_length = self.hop_length, 
                                       normalized=False)
-    
-    
-    self.melscale = T.MelScale(n_mels = self.n_mels,
-                              sample_rate = self.sample_rate,
-                              n_stft = n_fft)
-    
-    self.inv_melscale = T.InverseMelScale(n_stft = n_fft,
-                                          n_mels = self.n_mels,
-                                         sample_rate = self.sample_rate)
-    
+
+
+
+  def get_mag_phase(self, spectrogram):
+    magnitude = torch.abs(spectrogram)
+    phase = torch.angle(spectrogram)
+    return magnitude, phase   
+  
+  
   def demod_phase(self, phase):
       
       '''
@@ -139,13 +134,7 @@ class ProcessAudio(nn.Module):
           real_demod (float32):   Demodulated phase of real
           imag_demod (float32):   Demodulated phase of imaginary
       '''
-      #phase = phase.squeeze(0).cpu().numpy()
- 
-      #calculate demodulated phase
-      #demodulated_phase = np.unwrap(phase)
       demodulated_phase = unwrap(phase)
-      demodulated_phase = torch.from_numpy(demodulated_phase).unsqueeze(0).cuda()
-      
       #get real and imagniary parts of the demodulated phase
       real_demod = torch.sin(demodulated_phase)
       imag_demod = torch.cos(demodulated_phase)
@@ -165,60 +154,60 @@ class ProcessAudio(nn.Module):
       """
       #wrap phase back its original state 
       wrap = torch.arctan2(real_demod, imag_demod)
-
+      magnitude = (self.db_to_amp(self.de_norm(magnitude)))
+      
       #construct complex spectrogram
-      complex_spectrogram = torch.exp(magnitude) * torch.exp(1j * wrap)
+      complex_spectrogram = magnitude * torch.exp(1j * wrap)
       return complex_spectrogram.unsqueeze(0)
 
 
-  def log_mag(self, magnitude):
-      return torch.log(magnitude + 1e-9)
-   
-  def get_mag_phase(self, spectrogram):
-    magnitude = torch.abs(spectrogram)
-    phase = torch.angle(spectrogram)
-    return magnitude, phase
+  def amp_to_db(self, magnitude):
+      '''
+      Amplitude to DB
+      '''
+      return 20 * torch.log10(torch.clamp(magnitude, min=1e-7)) - self.ref_level_db
+     
   
-  def istft(self, complex_spec):
-    return self.inv_spec(complex_spec)
+  def db_to_amp(self, db_spec):
+    """
+    DB to Amplitude
+    """
+    return torch.pow(10, db_spec / 20.0)
   
-  def mel(spec):
-    return self.melscale(spec)
+  
 
-  def inv_mel(mel_spec):
-    return self.inv_melscale(mel_spec) 
-  
   def perm(self, tensor):
       return tensor.permute(2, 0, 1)
 
   def de_perm(self, tensor):
     return tensor.permute(1, 2, 0) 
   
-  def norm(self, spec):
-    return torch.clamp((((spec - self.min_level_db) / -self.min_level_db)*2.)-1., -1, 1)
 
-  def de_norm(self, spec)
-    return (((torch.clamp(spec, -1, 1)+1.)/2.) * -self.min_level_db) + self.min_level_db
+  
+  def norm(self, db_spec):
+    return torch.clamp((((db_spec - self.min_level_db) / -self.min_level_db)*2.)-1., -1, 1) 
+  
+  def de_norm(self, norm_spec):
+    return (((torch.clamp(norm_spec, -1, 1) +1.) / 2.) * -self.min_level_db) + self.min_level_db + self.ref_level_db
 
-
-  def forward(self, audio):
-    
-    spectrogram = self.norm(self.atodb(self.mel(self.spec(audio))))
+  
+  def forward(self, audio):  
+    spectrogram = self.spec(audio)
     magnitude, phase = self.get_mag_phase(spectrogram)
     real_demod, imag_demod = self.demod_phase(phase)
-    features = torch.cat((self.perm(self.log_mag(magnitude)),
+    features = torch.cat((self.perm(self.norm(self.amp_to_db(magnitude))),
                           self.perm(real_demod),
-                          self.perm(imag_demod)), dim=1)  
+                          self.perm(imag_demod)), dim=1)
     return features
 
 
   def backward(self, features):
-    denoised_mag, denoised_real, denoised_imag = self.de_perm(features)
-    modulate_denoised = self.mod_phase(denoised_mag, 
-                                     denoised_real, 
-                                     denoised_imag)
-    denoised_audio = self.istft(self.inv_melscale(self.dbtoa(self.de_norm(modulate_denoised))))
-    return denoised_audio
+      denoised_mag, denoised_real, denoised_imag = self.de_perm(features)
+      modulate_denoised = self.mod_phase(denoised_mag, 
+                                      denoised_real, 
+                                      denoised_imag)
+      denoised_audio = self.inv_spec(modulate_denoised)
+      return denoised_audio
     
 
 class CleanNoisyPairDataset(Dataset):
