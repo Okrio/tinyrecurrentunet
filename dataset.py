@@ -1,10 +1,10 @@
 import os
 import numpy as np
 import librosa
-
-from scipy.io.wavfile import read as wavread
 import warnings
 warnings.filterwarnings("ignore")
+
+from scipy.io.wavfile import read as wavread
 
 import torch
 import torch.nn as nn
@@ -14,13 +14,17 @@ from torchaudio import functional as F
 from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchaudio import transforms
-from util import diff, unwrap
 
+from util import diff, unwrap
 
 import random
 random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
+
+
+
+
 
 #Calcualate Per-Channel Energy Normalization
 def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
@@ -47,11 +51,19 @@ def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
 
 
 
-class Augment:   
+class DataAugment:   
     
     '''
-    Applies data augmentation on the noise signal prior
+    Applies data augmentation on the target tensor signal
     
+    Augmentations:
+        Gain:                              randomised between -12 and -5 dB
+        Low-Pass bi-quad filter:           randomised between 7kHz and 10kHz
+        Hi-Pass bi-quad filter:            randomised between 800Hz and 1.2kHz
+    
+    Returns:
+        Processed tensor signal
+ 
     '''
     
     def __init__(self):
@@ -90,6 +102,7 @@ class Augment:
       return x
 
 
+    
 class ProcessAudio(nn.Module):
 
   def __init__(self,
@@ -111,7 +124,6 @@ class ProcessAudio(nn.Module):
                               hop_length = self.hop_length, 
                               power=None, 
                               normalized=False)
-    
     self.inv_spec = T.InverseSpectrogram(n_fft = self.n_fft, 
                                       hop_length = self.hop_length, 
                                       normalized=False)
@@ -129,12 +141,14 @@ class ProcessAudio(nn.Module):
       '''
       Calculates demodulated phase of real and imaginary
       Args:
-          spectrogram
+          Phase (float32):        Phase of the clean signal
       Returns:
-          real_demod (float32):   Demodulated phase of real
-          imag_demod (float32):   Demodulated phase of imaginary
+          real_demod (float32):   Demodulated phase of the real part of the clean signal
+          imag_demod (float32):   Demodulated phase of imaginary the part of the clean signal
       '''
+      
       demodulated_phase = unwrap(phase)
+      
       #get real and imagniary parts of the demodulated phase
       real_demod = torch.sin(demodulated_phase)
       imag_demod = torch.cos(demodulated_phase)
@@ -144,16 +158,19 @@ class ProcessAudio(nn.Module):
   
   def mod_phase(self, magnitude, real_demod, imag_demod):
       """
-      Reverse operation of demodulation
+      Reverse function of demodulation
       Args:
-        real_demod(float32): real part of the demodulated signal
-        imag_demod(float32): imaginary part of the demodulated signal
+        magnitude(float32):  denoised magnitude spectrogram
+        real_demod(float32): real part of the demodulated denoised signal
+        imag_demod(float32): imaginary part of the demodulated denoised signal
       Returns:
         Spectrogram(comeplx64)
       
       """
-      #wrap phase back its original state 
+      #reverse of unwrap function
       wrap = torch.arctan2(real_demod, imag_demod)
+    
+      #apply de-norm and dB to Amplitude on the denoised magnitude
       magnitude = (self.db_to_amp(self.de_norm(magnitude)))
       
       #construct complex spectrogram
@@ -161,18 +178,19 @@ class ProcessAudio(nn.Module):
       return complex_spectrogram.unsqueeze(0)
 
 
+    
   def amp_to_db(self, magnitude):
       '''
       Amplitude to DB
       '''
       return 20 * torch.log10(torch.clamp(magnitude, min=1e-7)) - self.ref_level_db
      
-  
+
   def db_to_amp(self, db_spec):
-    """
-    DB to Amplitude
-    """
-    return torch.pow(10, db_spec / 20.0)
+      """
+      DB to Amplitude
+      """
+      return torch.pow(10, db_spec / 20.0)
   
   
 
@@ -182,16 +200,39 @@ class ProcessAudio(nn.Module):
   def de_perm(self, tensor):
     return tensor.permute(1, 2, 0) 
   
-
+    
   
   def norm(self, db_spec):
+        """
+        normalize dB lavel spectrogram values to be
+        scaled between [-1, 1] using external 
+        minimum level
+        """
     return torch.clamp((((db_spec - self.min_level_db) / -self.min_level_db)*2.)-1., -1, 1) 
   
+  
   def de_norm(self, norm_spec):
+        """
+        de-normalize spectrogram values to dB level using 
+        external minimum level
+        """
     return (((torch.clamp(norm_spec, -1, 1) +1.) / 2.) * -self.min_level_db) + self.min_level_db + self.ref_level_db
 
+
   
-  def forward(self, audio):  
+  def forward(self, audio):
+    """
+    function to convert audio tenor to signal to feature tensor
+    
+    Argument:
+        Signal (Tensor)
+        shape: (1, time)
+       
+    Returns:
+        Features (Tensor)
+        shape: (751, 3, 257) 
+    
+    """
     spectrogram = self.spec(audio)
     magnitude, phase = self.get_mag_phase(spectrogram)
     real_demod, imag_demod = self.demod_phase(phase)
@@ -202,6 +243,19 @@ class ProcessAudio(nn.Module):
 
 
   def backward(self, features):
+   
+    """
+    function to convert features tensors back to audio time-domain tensor
+    
+    Argument:
+        features (Tensor)
+        shape: (751, 3, 257) 
+       
+    Returns:
+        Features (Tensor)
+        shape: (1, time)  
+    """
+    
       denoised_mag, denoised_real, denoised_imag = self.de_perm(features)
       modulate_denoised = self.mod_phase(denoised_mag, 
                                       denoised_real, 
@@ -211,6 +265,7 @@ class ProcessAudio(nn.Module):
     
 
 class CleanNoisyPairDataset(Dataset):
+    
     """
     Create a Dataset of clean and noisy audio pairs. 
     Each element is a tuple of the form (clean_spectrogam, noisy_spectrogram, clean waveform, noisy waveform, file_id)
