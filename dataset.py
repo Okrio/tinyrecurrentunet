@@ -23,9 +23,6 @@ torch.manual_seed(0)
 np.random.seed(0)
 
 
-
-
-
 #Calcualate Per-Channel Energy Normalization
 def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
     frames = x.split(1, -2)
@@ -191,17 +188,16 @@ class ProcessAudio(nn.Module):
       DB to Amplitude
       """
       return torch.pow(10, db_spec / 20.0)
-  
-  
+
 
   def perm(self, tensor):
       return tensor.permute(2, 0, 1)
+
 
   def de_perm(self, tensor):
     return tensor.permute(1, 2, 0) 
   
     
-  
   def norm(self, db_spec):
         """
         normalize dB lavel spectrogram values to be
@@ -219,7 +215,6 @@ class ProcessAudio(nn.Module):
     return (((torch.clamp(norm_spec, -1, 1) +1.) / 2.) * -self.min_level_db) + self.min_level_db + self.ref_level_db
 
 
-  
   def forward(self, audio):
     """
     function to convert audio tenor to signal to feature tensor
