@@ -17,7 +17,6 @@ from cos_loss import CosSimLoss
 #instantiate DataProcessing and Cosine Similarity Loss classes
 dp = ProcessAudio()
 dp.to(device=torch.device("cuda"), dtype=torch.float32)
-cs = CosSimLoss()
 
 
 def flatten(v):
