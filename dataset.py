@@ -281,13 +281,13 @@ class CleanNoisyPairDataset(Dataset):
         self.resampler = T.Resample(48000, 16000)
         
         N_clean = len(os.listdir(os.path.join(root, 'clean')))
-        N_noisy = len(os.listdir(os.path.join(root, 'noisy')))
-        assert N_clean == N_noisy
+        #N_noisy = len(os.listdir(os.path.join(root, 'noisy')))
+        #assert N_clean == N_noisy
 
         if subset == "training":
-            self.files = [(os.path.join(root, 'clean', 'fileid_{}.wav'.format(i)),
-                           os.path.join(root, 'noisy', 'fileid_{}.wav'.format(i))) for i in range(N_clean)]
-        
+            self.files = [(os.path.join(root, 'clean', 'fileid_{}.wav'.format(i))) for i in range(N_clean)]
+            
+            self.noise_files = os.listdir(os.path.join(root, 'keyboard'))
         elif subset == "testing":
             sortkey = lambda name: '_'.join(name.split('_')[-2:])  # specific for dns due to test sample names
             _p = os.path.join(root, 'datasets/test_set/synthetic/no_reverb')  # path for DNS
@@ -313,8 +313,11 @@ class CleanNoisyPairDataset(Dataset):
     def __getitem__(self, n):
         
         fileid = self.files[n]
+        noise_file = random.choice(self.noise_files)
         clean_audio, sample_rate = torchaudio.load(fileid[0], normalize=True)
-        noise_audio, sample_rate = torchaudio.load(fileid[1], normalize=True)
+        noise_audio, sample_rate = torchaudio.load(noise_file, normalize=True)
+        #noise_audio, sample_rate = torchaudio.load(fileid[1], normalize=True)
+        
         
         #apply augmentation on noise
         noise_audio = self.aug(noise_audio)
