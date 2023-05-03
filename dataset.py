@@ -275,6 +275,7 @@ class CleanNoisyPairDataset(Dataset):
         
         super(CleanNoisyPairDataset).__init__()        
         assert subset is None or subset in ["training", "testing"]
+        self.aug = DataAugment()
         self.crop_length_sec = crop_length_sec
         self.subset = subset
         self.resampler = T.Resample(48000, 16000)
@@ -313,9 +314,11 @@ class CleanNoisyPairDataset(Dataset):
         
         fileid = self.files[n]
         clean_audio, sample_rate = torchaudio.load(fileid[0], normalize=True)
-        noisy_audio, sample_rate = torchaudio.load(fileid[1], normalize=True)
+        noise_audio, sample_rate = torchaudio.load(fileid[1], normalize=True)
         
-        #resample from 48kHz to 16kHz
+        #apply augmentation on noise
+        noise_audio = self.aug(noise_audio)
+        noisy_audio = clean_audio + noise_audio
         
         clean_audio, noisy_audio = clean_audio.squeeze(0), noisy_audio.squeeze(0)
         assert len(clean_audio) == len(noisy_audio)
