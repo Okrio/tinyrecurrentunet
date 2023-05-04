@@ -39,9 +39,9 @@
     },
     
     "trainset" : {
-        "root": "/home/trunet/data/trutest/",
+        "root": "/home/trutest/trutest_keyboard/",
         "crop_length_sec": 2,
-        "sample_rate":16000
+        "sample_rate":48000
     },
     
     "gen" : {
