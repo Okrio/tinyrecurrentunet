@@ -97,7 +97,7 @@ def unwrap(p, axis = -1):
   ph_cumsum = torch.cumsum(ph_correct, axis=axis)
   shape = torch.tensor(p.shape)
   shape[axis] = 1
-  ph_cumsum = torch.cat([torch.zeros(list(shape)), ph_cumsum], axis=axis)
+  #ph_cumsum = torch.cat([torch.zeros(list(shape)), ph_cumsum], axis=axis)
   unwrapped = p + ph_cumsum
   return unwrapped
 
@@ -256,8 +256,8 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     
    
     #L1 Loss
-    l1_loss = nn.L1Loss(denoised_audio, clean_audio)
-    loss += mse_loss.cuda()
+    l1_loss = nn.L1Loss()(denoised_audio, clean_audio)
+    loss += l1_loss.cuda()
     output_dic["l1"] = l1_loss.data
     
     #multi resolution short-time fourier transform loss
