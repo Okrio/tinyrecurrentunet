@@ -15,13 +15,40 @@ from torch.utils.data import Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchaudio import transforms
 
-from util import diff, unwrap
 
 import random
 random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
 
+def diff(x, axis):
+    shape = x.shape
+    begin_back = [0 for unused_s in range(len(shape))]
+    begin_front = [0 for unused_s in range(len(shape))]
+    begin_front[axis] = 1
+    size = list(shape)
+    size[axis] -= 1
+    slice_front = x[begin_front[0]:begin_front[0] + size[0], begin_front[1]:begin_front[1] + size[1]]
+    slice_back = x[begin_back[0]:begin_back[0]+size[0], begin_back[1]:begin_back[1]+size[1]]
+    d = slice_front - slice_back
+    return d
+
+
+def unwrap(p, axis = -1):
+  pi = torch.tensor(torch.acos(torch.zeros(1)).item() * 2)
+  dd = diff(p, axis=axis)
+  ddmod = torch.remainder(dd + pi, 2.0 * pi) - pi
+  idx = torch.logical_and(torch.eq(ddmod, -pi), torch.greater(dd, 0))
+  ddmod = torch.where(idx, torch.ones_like(ddmod) * pi, ddmod)
+  ph_correct = ddmod - dd
+  idx = torch.less(torch.abs(dd), pi)
+  ddmod = torch.where(idx, torch.zeros_like(ddmod), dd)
+  ph_cumsum = torch.cumsum(ph_correct, axis=axis)
+  shape = torch.tensor(p.shape)
+  shape[axis] = 1
+  #ph_cumsum = torch.cat([torch.zeros(list(shape)), ph_cumsum], axis=axis)
+  unwrapped = p + ph_cumsum
+  return unwrapped.squeeze(0)
 
 #Calcualate Per-Channel Energy Normalization
 def pcenfunc(x, eps=1E-6, s=0.025, alpha=0.98, delta=2, r=0.5, training=False):
@@ -89,7 +116,6 @@ class DataAugment:
       #get audgmentation parameters
       lp_cutoff = random.choice(self.lp_freqs)
       hp_cutoff = random.choice(self.hp_freqs)
-      pitch = random.choice(self.pitches)
       gain = random.choice(self.gains)
       
       #apply augmentation
@@ -128,7 +154,7 @@ class ProcessAudio(nn.Module):
 
 
   def get_mag_phase(self, spectrogram):
-    magnitude = torch.abs(spectrogram)
+    magnitude = torch.abs(spectrogram).squeeze(0)
     phase = torch.angle(spectrogram)
     return magnitude, phase   
   
@@ -204,7 +230,7 @@ class ProcessAudio(nn.Module):
         scaled between [-1, 1] using external 
         minimum level
         """
-    return torch.clamp((((db_spec - self.min_level_db) / -self.min_level_db)*2.)-1., -1, 1) 
+        return torch.clamp((((db_spec - self.min_level_db) / -self.min_level_db)*2.)-1., -1, 1) 
   
   
   def de_norm(self, norm_spec):
@@ -212,7 +238,7 @@ class ProcessAudio(nn.Module):
         de-normalize spectrogram values to dB level using 
         external minimum level
         """
-    return (((torch.clamp(norm_spec, -1, 1) +1.) / 2.) * -self.min_level_db) + self.min_level_db + self.ref_level_db
+        return (((torch.clamp(norm_spec, -1, 1) +1.) / 2.) * -self.min_level_db) + self.min_level_db + self.ref_level_db
 
 
   def forward(self, audio):
@@ -251,14 +277,15 @@ class ProcessAudio(nn.Module):
         shape: (1, time)  
     """
     
-      denoised_mag, denoised_real, denoised_imag = self.de_perm(features)
-      modulate_denoised = self.mod_phase(denoised_mag, 
+    denoised_mag, denoised_real, denoised_imag = self.de_perm(features)
+    modulate_denoised = self.mod_phase(denoised_mag, 
                                       denoised_real, 
                                       denoised_imag)
-      denoised_audio = self.inv_spec(modulate_denoised)
-      return denoised_audio
+    denoised_audio = self.inv_spec(modulate_denoised)
+    return denoised_audio
     
 
+    
 class CleanNoisyPairDataset(Dataset):
     
     """
@@ -275,6 +302,7 @@ class CleanNoisyPairDataset(Dataset):
         
         super(CleanNoisyPairDataset).__init__()        
         assert subset is None or subset in ["training", "testing"]
+        self.root = root
         self.aug = DataAugment()
         self.crop_length_sec = crop_length_sec
         self.subset = subset
@@ -314,17 +342,20 @@ class CleanNoisyPairDataset(Dataset):
         
         fileid = self.files[n]
         noise_file = random.choice(self.noise_files)
-        clean_audio, sample_rate = torchaudio.load(fileid[0], normalize=True)
+        noise_file = os.path.join(self.root, 'keyboard/'+ noise_file)
+        
+        clean_audio, sample_rate = torchaudio.load(fileid, normalize=True)
         noise_audio, sample_rate = torchaudio.load(noise_file, normalize=True)
         #noise_audio, sample_rate = torchaudio.load(fileid[1], normalize=True)
         
         
         #apply augmentation on noise
         noise_audio = self.aug(noise_audio)
-        noisy_audio = clean_audio + noise_audio
+        #noisy_audio = clean_audio + noise_audio
         
-        clean_audio, noisy_audio = clean_audio.squeeze(0), noisy_audio.squeeze(0)
-        assert len(clean_audio) == len(noisy_audio)
+        #clean_audio, noisy_audio = clean_audio.squeeze(0), noisy_audio.squeeze(0)
+        clean_audio = clean_audio.squeeze(0)
+        #assert len(clean_audio) == len(noisy_audio)
         #random crop audio
         
         crop_length = int(self.crop_length_sec * sample_rate)
@@ -334,7 +365,8 @@ class CleanNoisyPairDataset(Dataset):
         if self.subset != 'testing' and crop_length > 0:
             start = np.random.randint(low=0, high=len(clean_audio) - crop_length + 1)
             clean_audio = clean_audio[start:(start + crop_length)]
-            noisy_audio = noisy_audio[start:(start + crop_length)]
+            #noisy_audio = noisy_audio[start:(start + crop_length)]
+            noisy_audio = clean_audio + noise_audio
             
             clean_audio = clean_audio.unsqueeze(0)
             noisy_audio = noisy_audio.unsqueeze(0)
@@ -369,7 +401,7 @@ def load_CleanNoisyPairDataset(root,
 
 if __name__ == '__main__':
     import json
-    with open('/content/tinyrecurrentunet/config/tiny.json') as f:
+    with open('/home/tinyrecurrentunet/config/tiny.json') as f:
         data = f.read()
     config = json.loads(data)
     trainset_config = config['trainset']
