@@ -183,8 +183,6 @@ def sampling(net, noisy_features):
     return net(noisy_features)
 
 
-
-
 def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     
     """
@@ -224,6 +222,8 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
    
     #L1 Loss
     l1_loss = nn.L1Loss()(denoised_audio, clean_audio)
+    l1_loss = torch.abs(l1_loss)
+    
     loss += l1_loss.cuda()
     output_dic["l1"] = l1_loss.data
     
