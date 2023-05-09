@@ -225,7 +225,6 @@ class ProcessAudio(nn.Module):
   def de_perm(self, tensor):
     return tensor.permute(1, 2, 0) 
   
-
   
   def norm(self, db_spec):
         """
@@ -273,7 +272,7 @@ class ProcessAudio(nn.Module):
     return features
 
 
-  def backward(self, features):
+  def backward(self, denosied_features):
     """
     function to convert features tensors back to audio time-domain tensor
     
@@ -286,7 +285,7 @@ class ProcessAudio(nn.Module):
         shape: (1, time)  
     """
     
-    denoised_mag, denoised_real, denoised_imag = self.de_perm(features)
+    denoised_mag, denoised_real, denoised_imag = self.de_perm(denoised_features)
     modulate_denoised = self.mod_phase(denoised_mag, 
                                       denoised_real, 
                                       denoised_imag)
