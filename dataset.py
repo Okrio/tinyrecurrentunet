@@ -132,7 +132,7 @@ class ProcessAudio(nn.Module):
   def __init__(self,
                n_fft = 512,
                hop_length = 128,
-               sample_rate = 16000,
+               sample_rate = 48000,
                min_level_db = -100):
     
     super().__init__()
@@ -141,7 +141,7 @@ class ProcessAudio(nn.Module):
     self.hop_length = hop_length
     self.sample_rate = sample_rate
     self.min_level_db = min_level_db
-    self.sr = 48000
+    self.sr = sample_rate
     self.min_level_db = -100.
     self.ref_level_db = 25.
     self.spec = T.Spectrogram(n_fft = self.n_fft, 
