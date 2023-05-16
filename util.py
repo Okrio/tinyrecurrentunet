@@ -210,14 +210,29 @@ def loss_fn(net, X, ell_p, ell_p_lambda, stft_lambda, mrstftloss, **kwargs):
     output_dic = {}
     loss = 0.0
     
-    #from time-domain to 4-features (log-Mag Spec, PCEN, demod Real, demod Imag)
+    #from time-domain to 3-features (dB log-Mag Spec, demod real, demod imag)
     noisy_feat = dp(noisy_audio)
     
     #forward propagation
-    denoised_feat = net(noisy_feat)  
+    #output is of (751, 8, 251) which is 2 sets of (751, 4, 251), one for the mixture signal and one for noise
+    output_feat = net(noisy_feat)  
     
-    #convert features back to time-domain
-    denoised_audio = dp.backward(denoised_feat)
+    
+    mixture_db_mag, mixture_demod_real, mixture_demod_imag = output_feat.de_perm()[0] #get features for mixture
+    noise_mag, noise_demod_real, noise_demod_real = output_feat.de_perm()[1] # #get features for noise
+    
+    mixture_mag, mixture_phase = #some function
+    noise_mag, noise_phase = #some function
+    # Phase-aware β-sigmoid mask
+    
+    denoised = phm_mask(mixture_mag,
+                        mixture_phase,
+                        noise_mag,
+                        noise_phase)
+    
+    #convert masked magnitude and phase back to audio domain with iSTFT
+    denoised_audio = 
+    #denoised_audio = dp.backward(denoised_feat)
     
    
     #L1 Loss
