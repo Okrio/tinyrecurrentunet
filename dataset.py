@@ -285,7 +285,7 @@ class ProcessAudio(nn.Module):
         shape: (1, time)  
     """
     
-    denoised_mag, denoised_real, denoised_imag = self.de_perm(denoised_features)
+    denoised_mag, denoised_real, denoised_imag = self.de_perm(denosied_features)
     modulate_denoised = self.mod_phase(denoised_mag, 
                                       denoised_real, 
                                       denoised_imag)
