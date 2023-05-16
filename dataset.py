@@ -380,7 +380,9 @@ class CleanNoisyPairDataset(Dataset):
             noisy_audio = clean_audio + noise_audio
             
             clean_audio = clean_audio.unsqueeze(0)
+            noise_audio = noise_audio.unsqueeze(0)
             noisy_audio = noisy_audio.unsqueeze(0)
+            
         return (clean_audio, noisy_audio, fileid)
 
 
