@@ -137,7 +137,7 @@ class TRUNet(nn.Module):
         self.down5 = DepthwiseSeparableConv1d(128, 128, 5, 2)
         self.down6 = DepthwiseSeparableConv1d(128, 128, 3, 2)
         self.FGRU = GRUBlock(128, 64, 64, bidirectional=True)
-        self.TGRU = GRUBlock(64, 128, 64, bidirectional=False)
+        self.TGRU = GRUBlock(64, 128, 64, bidirectional=False, batch_firs=False)
         self.up1 = FirstTrCNN(64, 64, 3, 2)
         self.up2 = TrCNN(192, 64, 5, 2)
         self.up3 = TrCNN(192, 64, 3, 1)
