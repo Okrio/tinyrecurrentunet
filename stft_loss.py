@@ -1,10 +1,3 @@
-# Adapted from https://github.com/kan-bayashi/ParallelWaveGAN
-
-# Original Copyright 2019 Tomoki Hayashi
-#  MIT License (https://opensource.org/licenses/MIT)
-
-"""STFT-based Loss modules."""
-
 import torch
 import torch.nn.functional as F
 
