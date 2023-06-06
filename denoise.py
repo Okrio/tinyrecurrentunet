@@ -51,7 +51,7 @@ def denoise(output_directory, ckpt_iter, subset, dump=False):
     )
 
     # predefine model
-    net = CleanUNet(**network_config).cuda()
+    net = TinyUnet(**network_config).cuda()
     print_size(net)
 
     # load checkpoint
