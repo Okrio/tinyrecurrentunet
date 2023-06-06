@@ -1,6 +1,3 @@
-#The code has to be adjusted to 48kHz audio data.
-
-
 import os
 import sys
 from collections import defaultdict
